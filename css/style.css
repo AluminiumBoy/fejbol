@@ -641,3 +641,9 @@ img.tc-img.sil{filter:brightness(0) opacity(.45);background:none}
 .thought.off{opacity:0;pointer-events:none}
 @media (prefers-reduced-motion:no-preference){.thought.pop{animation:tpop .35s ease-out}@keyframes tpop{0%{transform:scale(.6);opacity:0}100%{transform:none;opacity:1}}}
 .ask .pics{font-size:1.5rem;letter-spacing:.1em}
+
+/* képes súgás gombok és soronkénti képek */
+.btn.picbtn{min-height:42px;font-size:.92rem;background-color:var(--glass);border-color:var(--glass-brd);color:var(--ink);align-self:center;padding-inline:16px}
+.btn.picbtn.on{background:var(--pen-soft);border-color:var(--pen);color:var(--pen)}
+.lpics{display:none;font-size:1.05em;letter-spacing:.08em;margin-left:.3em;white-space:nowrap}
+.showpics .lpics{display:inline}

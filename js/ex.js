@@ -2,8 +2,8 @@
 //   ui  = { body, dock, progress(0..1), finish(score), cleanup(fn), toast(msg) }
 //   set = [{ i: versszak sorszáma, lines: [...] }]
 //   ctx = { allWords: a vers összes szava (tippekhez) }
-import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=22';
-import { lineImages } from './imagery.js?v=22';
+import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=23';
+import { lineImages } from './imagery.js?v=23';
 
 export const EXERCISES = {
   listen:   { name: 'Meghallgatás', short: 'Hallgasd meg és olvasd fel', help: 'Hallgasd meg, aztán olvasd fel hangosan te is.', icon: 'M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4' },
@@ -35,6 +35,26 @@ function sheet(set, renderLine) {
 }
 const ln = (si, li, content, cls = '') =>
   `<span class="ln ${cls}">${li === 0 ? `<span class="snum">${si + 1}.</span>` : ''}${content}</span>`;
+
+// ---------- képes súgás (kettős kódolás) ----------
+// a sor képei a róka gondolatbuborékában; ha nincs róka, felugró sávban. Nem számít hibának.
+function showPics(ui, line) {
+  const pics = line ? lineImages(line) : [];
+  if (!pics.length) return ui.toast('Ehhez a sorhoz nincs kép.');
+  ui.tip?.('imagery', 'Képzeld el a képeket! Az agy a képeket sokkal könnyebben megjegyzi, mint a szavakat.');
+  if (ui.pet) ui.pet.think(line); else ui.toast(pics.join(' '));
+}
+const picBtn = (line, label = 'Képes súgás') => line && lineImages(line).length ? `<button class="btn picbtn" id="pics">💭 ${label}</button>` : '';
+const wirePics = (ui, getLine) => ui.dock.querySelector('#pics')?.addEventListener('click', () => showPics(ui, getLine()));
+// soronkénti képek a sor végén (a teljes versszakot mutató feladatokhoz), a kapcsoló a .showpics osztály
+const linePics = l => { const p = lineImages(l); return p.length ? ` <span class="lpics">${p.join('')}</span>` : ''; };
+const picToggle = () => `<button class="btn picbtn" id="picsAll">💭 Képek a sorok mellett</button>`;
+function wirePicToggle(ui) {
+  ui.dock.querySelector('#picsAll')?.addEventListener('click', e => {
+    const on = ui.body.classList.toggle('showpics'); e.currentTarget.classList.toggle('on', on);
+    if (on) ui.tip?.('imagery', 'Képzeld el a képeket! Az agy a képeket sokkal könnyebben megjegyzi, mint a szavakat.');
+  });
+}
 
 function shake(el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
 const clamp = x => Math.max(0, Math.min(1, x));
@@ -221,7 +241,8 @@ function rhyme(ui, set, ctx) {
   const dockDraw = () => {
     const it = lines[k];
     ui.dock.innerHTML = `<p class="muted small" style="margin:0">Hogy végződik a sor? Figyelj a rímre!</p>
-      <div class="opts">${options(it.target).map(o => `<button class="opt" data-w="${esc(o)}">${esc(o)}</button>`).join('')}</div>`;
+      <div class="opts">${options(it.target).map(o => `<button class="opt" data-w="${esc(o)}">${esc(o)}</button>`).join('')}</div>${picBtn(it.l)}`;
+    ui.pet?.think(null); wirePics(ui, () => it.l);
     ui.dock.querySelectorAll('.opt').forEach(b => b.onclick = () => {
       if (filled) return;
       if (b.dataset.w === it.target) {
@@ -272,7 +293,8 @@ function cloze(ui, set, ctx) {
   };
   const dockDraw = () => {
     const it = items[k];
-    ui.dock.innerHTML = `<div class="opts">${options(it.target).map(o => `<button class="opt" data-w="${esc(o)}">${esc(o)}</button>`).join('')}</div>`;
+    ui.dock.innerHTML = `<div class="opts">${options(it.target).map(o => `<button class="opt" data-w="${esc(o)}">${esc(o)}</button>`).join('')}</div>${picBtn(it.l)}`;
+    ui.pet?.think(null); wirePics(ui, () => it.l);
     ui.dock.querySelectorAll('.opt').forEach(b => b.onclick = () => {
       if (filled) return;
       if (b.dataset.w === it.target) {
@@ -304,7 +326,7 @@ function order(ui, set) {
     ui.body.querySelectorAll('.lcard').forEach(b => b.onclick = () => {
       const c = pool[+b.dataset.n];
       if (c.l === set[si].lines[placed]) {
-        pool[+b.dataset.n] = null; ui.sfx('good'); placed++; done++; ui.progress(done / total);
+        pool[+b.dataset.n] = null; ui.sfx('good'); ui.pet?.think(null); placed++; done++; ui.progress(done / total);
         if (placed >= set[si].lines.length) {
           si++;
           if (si >= set.length) return ui.finish(clamp(1 - mistakes / (total * 2)));
@@ -314,7 +336,8 @@ function order(ui, set) {
       } else { mistakes++; ui.sfx('bad'); b.classList.add('wrong'); shake(b); setTimeout(() => b.classList.remove('wrong'), 600); }
     });
   };
-  ui.dock.innerHTML = `<p class="muted small" style="margin:0">${EXERCISES.order.help}</p>`;
+  ui.dock.innerHTML = `<p class="muted small" style="margin:0">${EXERCISES.order.help}</p><button class="btn picbtn" id="pics">💭 Képes súgás: mi jön?</button>`;
+  wirePics(ui, () => set[si]?.lines[placed]);
   start(); draw(); ui.progress(0);
 }
 
@@ -339,7 +362,9 @@ function wordsEx(ui, set) {
       if (g === k) return ln(si, li, placed >= target.length ? esc(l) : partial(l, placed) + ' <span class="ask">…</span>', 'hl');
       return null;
     });
-    ui.dock.innerHTML = `<div class="wpool">${chips.map((c, n) => `<button class="wchip ${c.used ? 'used' : ''}" data-n="${n}">${esc(c.w)}</button>`).join('')}</div>`;
+    ui.dock.innerHTML = `<div class="wpool">${chips.map((c, n) => `<button class="wchip ${c.used ? 'used' : ''}" data-n="${n}">${esc(c.w)}</button>`).join('')}</div>${picBtn(lines[k].l)}`;
+    if (placed === 0) ui.pet?.think(null);
+    wirePics(ui, () => lines[k].l);
     ui.dock.querySelectorAll('.wchip').forEach(b => b.onclick = () => {
       const c = chips[+b.dataset.n];
       if (c.used) return;
@@ -373,7 +398,7 @@ function hide(ui, set) {
         return `<button class="w ${revealed.has(k) ? 'shown' : 'hid'}" data-k="${k}">${esc(t.w)}</button>`;
       }
       return esc(t.w);
-    }).join('')));
+    }).join('') + linePics(l)));
     return hiddenNow;
   };
   const startRound = () => {
@@ -381,7 +406,9 @@ function hide(ui, set) {
     hiddenTotal += draw();
     ui.dock.innerHTML = `
       <p class="muted small" style="margin:0">${round + 1}. kör a 3-ból: ${round === 2 ? 'minden szó eltűnt, mondd el fejből.' : 'mondd el hangosan az egészet.'} Ha elakadsz, koppints a szóra.</p>
-      <button class="btn big primary wide" id="nextR">${round < 2 ? 'Elmondtam, jöhet a nehezebb' : 'Elmondtam, kész'}</button>`;
+      <button class="btn big primary wide" id="nextR">${round < 2 ? 'Elmondtam, jöhet a nehezebb' : 'Elmondtam, kész'}</button>${picToggle()}`;
+    wirePicToggle(ui);
+    if (ui.body.classList.contains('showpics')) ui.dock.querySelector('#picsAll')?.classList.add('on');
     ui.dock.querySelector('#nextR').onclick = () => {
       round++; ui.progress(round / 3);
       if (round >= 3) ui.finish(clamp(1 - reveals / Math.max(1, hiddenTotal)));
@@ -403,7 +430,7 @@ function initials(ui, set) {
     if (t.t !== undefined) return esc(t.t);
     total++;
     return `<button class="w init"><span class="fl">${esc(t.w[0])}</span><span class="rest">${esc(t.w.slice(1))}</span></button>`;
-  }).join('')));
+  }).join('') + linePics(l)));
   ui.body.onclick = e => {
     const b = e.target.closest('.w.init'); if (!b || b.classList.contains('shown')) return;
     b.classList.add('shown'); reveals++;
@@ -411,7 +438,8 @@ function initials(ui, set) {
   ui.cleanup(() => { ui.body.onclick = null; });
   ui.dock.innerHTML = `
     <p class="muted small" style="margin:0">${EXERCISES.initials.help}</p>
-    <button class="btn big primary wide" id="fin">Elmondtam</button>`;
+    <button class="btn big primary wide" id="fin">Elmondtam</button>${picToggle()}`;
+  wirePicToggle(ui);
   ui.dock.querySelector('#fin').onclick = () => ui.finish(clamp(1 - reveals / Math.max(1, total)));
   ui.progress(0);
 }
