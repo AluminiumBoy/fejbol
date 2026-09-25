@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fejből kisállat próba</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Nunito:wght@600;800&display=swap">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+<style>
+  :root{color-scheme:dark}
+  html,body{margin:0;height:100%;background:#0B0D12;color:#F1F3F8;font-family:"Nunito",system-ui,sans-serif;overflow:hidden;-webkit-tap-highlight-color:transparent}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  .hud{position:fixed;left:0;right:0;top:0;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 0;display:flex;align-items:center;gap:10px;pointer-events:none}
+  .name{font-family:"Anton",Impact,sans-serif;font-size:1.8rem;letter-spacing:.02em;text-transform:uppercase;text-shadow:0 2px 12px rgba(0,0,0,.6)}
+  .stage{margin-left:auto;background:rgba(20,24,34,.6);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:6px 12px;font-weight:800;font-size:.9rem}
+  .bubble{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:#fff;color:#12151C;font-weight:800;padding:10px 16px;border-radius:18px;box-shadow:0 10px 30px -10px rgba(0,0,0,.6);max-width:80vw;text-align:center;transition:opacity .25s;pointer-events:none}
+  .bubble::after{content:"";position:absolute;left:50%;bottom:-8px;margin-left:-8px;border:8px solid transparent;border-top-color:#fff;border-bottom:0}
+  .bubble[hidden]{display:block!important;opacity:0}
+  .dock{position:fixed;left:0;right:0;bottom:0;padding:0 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px}
+  .row{display:flex;gap:8px}
+  button{font:inherit;color:inherit;cursor:pointer}
+  .btn{flex:1;min-height:56px;border-radius:16px;border:1px solid rgba(255,255,255,.12);background:rgba(24,29,41,.62);backdrop-filter:blur(16px) saturate(150%);-webkit-backdrop-filter:blur(16px) saturate(150%);font-weight:800;font-size:1rem;display:flex;align-items:center;justify-content:center;gap:8px}
+  .btn img{width:26px;height:26px}
+  .btn.on{background:#FF3D5A;border-color:#FF3D5A;color:#fff;box-shadow:0 0 30px -6px #FF3D5A}
+  .btn.talk{flex:2;background:#C6FF3D;color:#0B0D12;border-color:#C6FF3D;font-family:"Anton",Impact,sans-serif;font-weight:400;font-size:1.3rem;letter-spacing:.04em;text-transform:uppercase}
+  .btn.talk.on{background:#FF3D5A;color:#fff;border-color:#FF3D5A}
+  .chips{display:flex;gap:6px;justify-content:center}
+  .chip{border:1px solid rgba(255,255,255,.14);background:rgba(24,29,41,.62);border-radius:999px;padding:6px 12px;font-weight:800;font-size:.85rem;color:#B9C0D0}
+  .chip[aria-pressed="true"]{background:#F1F3F8;color:#0B0D12}
+  .level{height:6px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden;margin:0 auto;width:min(260px,70vw)}
+  .level i{display:block;height:100%;background:#FF6FB5}
+  .credit{position:fixed;right:10px;bottom:4px;font-size:.6rem;opacity:.35;pointer-events:none}
+  .pick{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:16px;background:rgba(8,10,16,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+  .pick[hidden]{display:none!important}
+  .pick h2{margin:0;font-family:"Anton",Impact,sans-serif;font-weight:400;font-size:2.2rem;text-transform:uppercase;letter-spacing:.03em}
+  .pick .row{width:min(420px,100%)}
+  .btn.big{flex-direction:column;min-height:150px;font-size:1.3rem;line-height:1.2}
+  .btn.big img{width:64px;height:64px}
+  .btn.big small{font-weight:600;opacity:.7;font-size:.85rem}
+  .loading{position:fixed;inset:0;display:grid;place-items:center;font-weight:800}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="loading" id="loading">Betöltés…</div>
+<div class="hud"><button class="name" id="name" style="background:none;border:0;padding:0;pointer-events:auto">Rókus</button><span class="stage" id="stage">Kölyök</span></div>
+<div class="pick" id="pick" hidden>
+  <h2>Kit nevelsz?</h2>
+  <div class="row"><button class="btn big" data-g="m"><img src="cap.png" alt="">Rókus<br><small>fiú róka</small></button><button class="btn big" data-g="f"><img src="ribbon.png" alt="">Roxi<br><small>lány róka</small></button></div>
+</div>
+<div class="bubble" id="bubble" hidden>Szia! Mondj valamit!</div>
+<div class="dock">
+  <div class="chips" id="grow">
+    <button class="chip" data-s="0" aria-pressed="true">Kölyök</button>
+    <button class="chip" data-s="1">Kamasz</button>
+    <button class="chip" data-s="2">Felnőtt</button>
+    <button class="chip" data-s="3">Legenda</button>
+  </div>
+  <div class="row">
+    <button class="btn talk" id="talk">Beszélj hozzá</button>
+  </div>
+  <div class="row">
+    <button class="btn" id="feed"><img src="drumstick.png" alt="">Etetés</button>
+    <button class="btn" id="sleep"><img src="zzz.png" alt="">Alvás</button>
+    <button class="btn" id="poem"><img src="sparkles.png" alt="">Versmondás</button>
+  </div>
+</div>
+<div class="credit">Róka: PixelMannen (CC0), animáció: tomkranis (CC BY 4.0) · ikonok: Microsoft Fluent (MIT) · hang: Microsoft neurális hang</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+// esti égbolt színátmenettel
+function skyTex(top, bottom) {
+  const c = document.createElement('canvas'); c.width = 2; c.height = 256;
+  const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0, top); gr.addColorStop(1, bottom); g.fillStyle = gr; g.fillRect(0, 0, 2, 256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const dayBg = skyTex('#2B1B4A', '#E0708A'), nightBg = skyTex('#05060C', '#1A1F3A');
+scene.background = dayBg;
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const hemi = new THREE.HemisphereLight(0xffe6d5, 0x2a2140, 1.1); scene.add(hemi);
+const key = new THREE.DirectionalLight(0xfff0e0, 2.4); key.position.set(3, 6, 4); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048); key.shadow.radius = 5;
+Object.assign(key.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3 }); scene.add(key);
+const rim = new THREE.DirectionalLight(0x8fb8ff, 1.4); rim.position.set(-4, 3, -3); scene.add(rim);
+
+// padló: kerek szőnyeg árnyékkal
+const rug = new THREE.Mesh(new THREE.CircleGeometry(1.6, 64), new THREE.MeshStandardMaterial({ color: 0x3B2F5C, roughness: .9 }));
+rug.rotation.x = -Math.PI / 2; rug.receiveShadow = true; scene.add(rug);
+const ring = new THREE.Mesh(new THREE.RingGeometry(1.6, 1.68, 64), new THREE.MeshStandardMaterial({ color: 0xFF6FB5, emissive: 0xFF3DA5, emissiveIntensity: .6 }));
+ring.rotation.x = -Math.PI / 2; ring.position.y = .001; scene.add(ring);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0x1E1830, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = -.002; ground.receiveShadow = true; scene.add(ground);
+
+const camera = new THREE.PerspectiveCamera(35, 1, .05, 100);
+camera.position.set(0, 1.35, 3.9); camera.lookAt(0, .55, 0);
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h;
+  camera.fov = w < h ? 42 : 32; camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize); resize();
+
+// ---------- a róka ----------
+let fox, mixer, actions = {}, head = null, baseScale = 1, current = 'Survey';
+const pivot = new THREE.Group(); scene.add(pivot);
+new GLTFLoader().load('fox.glb', g => {
+  fox = g.scene;
+  fox.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } if (o.isBone && /head/i.test(o.name) && !head) head = o; });
+  const box = new THREE.Box3().setFromObject(fox), size = box.getSize(new THREE.Vector3());
+  baseScale = 1.0 / size.y;
+  fox.scale.setScalar(baseScale);
+  fox.rotation.y = Math.PI / 2 * -1 + Math.PI / 2 + .35; // kicsit a néző felé fordul
+  pivot.add(fox);
+  mixer = new THREE.AnimationMixer(fox);
+  g.animations.forEach(a => actions[a.name] = mixer.clipAction(a));
+  actions.Survey.play();
+  document.getElementById('loading').remove();
+  setStage(0);
+  if (gender) { document.getElementById('name').textContent = NAMES[gender]; capS.visible = gender === 'm'; ribbonS.visible = gender === 'f'; say('Koppints rám, vagy mondj valamit!', null, 3000); }
+  else document.getElementById('pick').hidden = false;
+});
+function play(name, fade = .25) {
+  if (!actions[name] || current === name) return;
+  actions[name].reset().fadeIn(fade).play();
+  actions[current]?.fadeOut(fade);
+  current = name;
+}
+
+// ---------- sprite-ok (szív, falat, korona, napszemüveg, Zzz) ----------
+const texLoader = new THREE.TextureLoader();
+const tex = n => { const t = texLoader.load(n); t.colorSpace = THREE.SRGBColorSpace; return t; };
+const T = { heart: tex('red_heart.png'), food: tex('drumstick.png'), crown: tex('crown.png'), glasses: tex('sunglasses.png'), sparkle: tex('sparkles.png'), zzz: tex('zzz.png') };
+const sprite = (t, s) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false })); sp.scale.setScalar(s); return sp; };
+const particles = [];
+function burst(t, n, from) {
+  for (let i = 0; i < n; i++) {
+    const sp = sprite(t, .18 + Math.random() * .1); sp.position.copy(from).add(new THREE.Vector3((Math.random() - .5) * .5, Math.random() * .2, (Math.random() - .5) * .3));
+    scene.add(sp); particles.push({ sp, v: new THREE.Vector3((Math.random() - .5) * .4, .8 + Math.random() * .6, 0), life: 1.4 });
+  }
+}
+const crown = sprite(T.crown, .32), glasses = sprite(T.glasses, .26), zzz = sprite(T.zzz, .3);
+const capS = sprite(tex('cap.png'), .3), ribbonS = sprite(tex('ribbon.png'), .24);
+crown.visible = glasses.visible = zzz.visible = capS.visible = ribbonS.visible = false; scene.add(crown, glasses, zzz, capS, ribbonS);
+const headPos = new THREE.Vector3();
+
+// ---------- növekedés ----------
+const STAGES = [['Kölyök', .5], ['Kamasz', .64], ['Felnőtt', .8], ['Legenda', .92]];
+let stage = 0, growTo = STAGES[0][1], growNow = STAGES[0][1];
+function setStage(s) {
+  stage = s; growTo = STAGES[s][1];
+  document.getElementById('stage').textContent = STAGES[s][0];
+  document.querySelectorAll('#grow .chip').forEach(b => b.setAttribute('aria-pressed', +b.dataset.s === s));
+  glasses.visible = s >= 2; crown.visible = s >= 3;
+  if (s >= 1) { hop(); burst(T.sparkle, 6, new THREE.Vector3(0, .8, 0)); say('Nézd, megnőttem!', 'grow'); }
+}
+document.querySelectorAll('#grow .chip').forEach(b => b.onclick = () => setStage(+b.dataset.s));
+
+// ---------- nem, név, hang ----------
+let gender = localStorage.getItem('fejbol.pet.g') || '';
+const NAMES = { m: 'Rókus', f: 'Roxi' };
+const acc = { m: null, f: null };
+function setGender(g) {
+  gender = g; try { localStorage.setItem('fejbol.pet.g', g); } catch (e) {}
+  document.getElementById('name').textContent = NAMES[g];
+  document.getElementById('pick').hidden = true;
+  capS.visible = g === 'm'; ribbonS.visible = g === 'f';
+  voiceCache.clear();
+  say('Szia! Én vagyok ' + NAMES[g] + '. Mondj valamit!', 'hello', 3200);
+}
+document.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { audio(); setGender(b.dataset.g); hop(); });
+document.getElementById('name').onclick = () => { document.getElementById('pick').hidden = false; };
+
+// ---------- beszédbuborék + hang (a száj a hang erejére mozog) ----------
+let bubbleT, voiceSrc = null;
+const voiceCache = new Map();
+async function voice(key) {
+  if (!voiceCache.has(key)) voiceCache.set(key, fetch(`voice/${gender || 'm'}/${key}.mp3`).then(r => r.arrayBuffer()).then(b => audio().decodeAudioData(b)));
+  return voiceCache.get(key);
+}
+async function speakBuffer(buf, rate = 1) {
+  const a = audio();
+  try { voiceSrc?.stop(); } catch (e) {}
+  const src = a.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate;
+  const an = a.createAnalyser(); an.fftSize = 1024;
+  src.connect(an); an.connect(a.destination);
+  replayAn = an; voiceSrc = src; src.start();
+  return new Promise(res => src.onended = () => { if (voiceSrc === src) { replayAn = null; voiceSrc = null; } res(); });
+}
+function say(txt, key, ms = 2400) {
+  const b = document.getElementById('bubble'); b.textContent = txt; b.hidden = false;
+  clearTimeout(bubbleT); bubbleT = setTimeout(() => b.hidden = true, ms);
+  if (key && gender && ac) voice(key).then(buf => speakBuffer(buf)).catch(() => {});
+}
+
+// ---------- mozgások ----------
+let jumpT = -1, eatT = -1, talkLevel = 0, asleep = false;
+function hop() { jumpT = 0; play('Run', .1); setTimeout(() => !asleep && play('Survey'), 700); }
+const LINES = [['Hihi, ez csiklandoz!', 'poke1'], ['Tanuljunk még egy versszakot?', 'poke2'], ['Éhes vagyok… egy feladat?', 'poke3'], ['Te vagy a legjobb!', 'poke4'], ['Mondd el nekem a verset!', 'poke5']];
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+canvas.addEventListener('pointerdown', e => {
+  audio();
+  if (!fox || asleep) { if (asleep) say('Zzz… hagyj aludni…', 'sleepy'); return; }
+  ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObject(pivot, true).length || Math.hypot(ndc.x, ndc.y + .1) < .45;
+  if (!hit) return;
+  const [t, k] = LINES[Math.floor(Math.random() * LINES.length)];
+  hop(); burst(T.heart, 4, headPos.clone()); say(t, k); blip(880);
+});
+
+// ---------- etetés ----------
+let food = null;
+document.getElementById('feed').onclick = () => {
+  if (!fox || food) return;
+  audio();
+  if (asleep) return say('Majd reggel!', 'later');
+  food = sprite(T.food, .3); food.position.set(0, 2.2, .35); scene.add(food);
+  say('Nyami!', 'yum');
+};
+
+// ---------- alvás ----------
+document.getElementById('sleep').onclick = e => {
+  asleep = !asleep; e.currentTarget.classList.toggle('on', asleep);
+  scene.background = asleep ? nightBg : dayBg;
+  hemi.intensity = asleep ? .35 : 1.1; key.intensity = asleep ? .5 : 2.4; ring.material.emissiveIntensity = asleep ? .2 : .6;
+  zzz.visible = asleep;
+  audio();
+  if (asleep) { if (listening) toggleTalk(); say('Jó éjt!', 'night'); if (actions.Survey) { play('Survey'); actions.Survey.timeScale = .25; } }
+  else { say('Jó reggelt! Tanulunk?', 'morning'); if (actions.Survey) actions.Survey.timeScale = 1; hop(); }
+};
+
+// ---------- hangok ----------
+let ac;
+function audio() { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); return ac; }
+function blip(f) {
+  const a = audio(), o = a.createOscillator(), g = a.createGain();
+  o.frequency.setValueAtTime(f, a.currentTime); o.frequency.exponentialRampToValueAtTime(f * 1.6, a.currentTime + .12);
+  g.gain.setValueAtTime(.08, a.currentTime); g.gain.exponentialRampToValueAtTime(.0001, a.currentTime + .18);
+  o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + .2);
+}
+
+// ---------- visszabeszélés (mint Talking Tom) ----------
+// figyeli a mikrofont; ha beszélsz, felveszi, ha elhallgatsz, magas hangon visszamondja
+let listening = false, stream, micAn, recorder, chunks = [], speaking = false, quietSince = 0, replaying = false;
+const talkBtn = document.getElementById('talk');
+talkBtn.onclick = toggleTalk;
+async function toggleTalk() {
+  if (listening) {
+    listening = false; talkBtn.classList.remove('on'); talkBtn.textContent = 'Beszélj hozzá';
+    stream?.getTracks().forEach(t => t.stop()); stream = null; return;
+  }
+  if (asleep) return say('Zzz… hagyj aludni…', 'sleepy');
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  } catch (e) { say('Engedélyezd a mikrofont, hogy halljalak!', 'mic', 3000); return; }
+  const a = audio();
+  micAn = a.createAnalyser(); micAn.fftSize = 1024;
+  a.createMediaStreamSource(stream).connect(micAn);
+  listening = true; talkBtn.classList.add('on'); talkBtn.textContent = 'Hallgatlak…';
+  say('Mondj valamit, visszamondom!', 'listen', 2500);
+}
+const buf = new Float32Array(1024);
+function level(an) { an.getFloatTimeDomainData(buf); let s = 0; for (const v of buf) s += v * v; return Math.sqrt(s / buf.length); }
+function vad(now) {
+  if (!listening || replaying || !micAn) return;
+  const l = level(micAn);
+  if (!speaking && l > .035) {
+    speaking = true; quietSince = 0; chunks = [];
+    recorder = new MediaRecorder(stream); recorder.ondataavailable = e => chunks.push(e.data);
+    recorder.onstop = replay; recorder.start();
+    play('Survey'); say('Hallgatlak…', null, 900);
+  } else if (speaking) {
+    if (l < .02) { quietSince ||= now; if (now - quietSince > 700) { speaking = false; recorder.stop(); } }
+    else quietSince = 0;
+  }
+}
+async function replay() {
+  if (!chunks.length) return;
+  replaying = true;
+  try {
+    const a = audio();
+    const ab = await new Blob(chunks, { type: recorder.mimeType }).arrayBuffer();
+    const b = await a.decodeAudioData(ab);
+    await speakBuffer(b, 1.6); // vékony, vicces hang
+    replaying = false; talkLevel = 0;
+  } catch (e) { replaying = false; }
+}
+let replayAn = null;
+
+// ---------- versmondás ----------
+document.getElementById('poem').onclick = async () => {
+  audio();
+  if (asleep) return say('Zzz… hagyj aludni…', 'sleepy');
+  try {
+    const idx = await (await fetch('../audio/index.json')).json();
+    const [text, e] = Object.entries(idx.stanzas)[0];
+    const v = gender === 'f' ? 'noemi' : 'tamas';
+    const buf = await audio().decodeAudioData(await (await fetch(`../audio/${v}/${e.file}.mp3`)).arrayBuffer());
+    say(text.split('\n')[0] + ' …', null, 4000);
+    play('Survey'); await speakBuffer(buf, 1.08);
+  } catch (err) { say('Most nem megy a versmondás.'); }
+};
+
+// ---------- fő ciklus ----------
+const clock = new THREE.Clock();
+function tick() {
+  const dt = Math.min(.05, clock.getDelta()), now = performance.now();
+  mixer?.update(dt);
+  vad(now);
+  if (fox) {
+    growNow += (growTo - growNow) * Math.min(1, dt * 4);
+    let y = 0, sy = 1, sx = 1;
+    if (jumpT >= 0) { jumpT += dt; const p = jumpT / .6; if (p >= 1) jumpT = -1; else { y = Math.sin(p * Math.PI) * .45 * growNow; sy = 1 + Math.sin(p * Math.PI) * .08; } }
+    if (replayAn) { const l = level(replayAn); talkLevel += (Math.min(1, l * 9) - talkLevel) * .5; } else talkLevel *= .8;
+    sy *= 1 + talkLevel * .12; sx *= 1 - talkLevel * .05;
+    if (asleep) sy *= 1 + Math.sin(now / 900) * .02;
+    pivot.position.y = y;
+    pivot.scale.set(growNow * sx, growNow * sy, growNow * sx);
+    if (eatT >= 0) { eatT += dt; pivot.rotation.x = Math.sin(eatT * 14) * .08; if (eatT > 1.4) { eatT = -1; pivot.rotation.x = 0; } }
+    if (head) { head.getWorldPosition(headPos); }
+    crown.position.copy(headPos).add(new THREE.Vector3(0, .22 * growNow, 0)); crown.scale.setScalar(.34 * growNow);
+    const toCam = camera.position.clone().sub(headPos).normalize();
+    glasses.position.copy(headPos).addScaledVector(toCam, .16 * growNow).add(new THREE.Vector3(0, .03 * growNow, 0)); glasses.scale.setScalar(.24 * growNow);
+    capS.position.copy(headPos).add(new THREE.Vector3(0, .2 * growNow, 0)); capS.scale.setScalar(.3 * growNow);
+    ribbonS.position.copy(headPos).add(new THREE.Vector3(.1 * growNow, .19 * growNow, 0)); ribbonS.scale.setScalar(.22 * growNow);
+    if (crown.visible) { capS.material.opacity = 0; } else capS.material.opacity = 1;
+    zzz.position.copy(headPos).add(new THREE.Vector3(.25, .3 + Math.sin(now / 600) * .05, 0));
+  }
+  if (food) {
+    const target = headPos.clone().add(new THREE.Vector3(0, .05, .1));
+    food.position.lerp(target, Math.min(1, dt * 3.5));
+    if (food.position.distanceTo(target) < .08) {
+      scene.remove(food); food = null; eatT = 0; blip(520); blip(700);
+      burst(T.heart, 5, headPos.clone()); say('Mmm, finom! Köszi!', 'thanks');
+      if (stage < 3) setTimeout(() => setStage(stage + 1), 900);
+    }
+  }
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]; p.life -= dt; p.sp.position.addScaledVector(p.v, dt); p.sp.material.opacity = Math.max(0, p.life / 1.4);
+    if (p.life <= 0) { scene.remove(p.sp); particles.splice(i, 1); }
+  }
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>
