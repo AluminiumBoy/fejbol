@@ -1,7 +1,7 @@
 // "Tanuljunk együtt": beszélgetős tanulás a nagy rókával.
 // 1. Mondd utánam  2. Folytasd (felváltva)  3. Egyedül. A róka felolvas, figyel, ellenőriz, dicsér.
-import { parseStanzas, esc, words, matchSpoken } from './text.js?v=28';
-import { lineScene, lineImages } from './imagery.js?v=28';
+import { parseStanzas, esc, words, matchSpoken } from './text.js?v=29';
+import { lineScene, lineImages } from './imagery.js?v=29';
 
 const LEVELS = { echo: 'Mondd utánam', alt: 'Folytasd', solo: 'Egyedül' };
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;

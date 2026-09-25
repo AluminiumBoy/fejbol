@@ -1,13 +1,13 @@
-import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=28';
-import * as S from './store.js?v=28';
-import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=28';
-import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=28';
-import * as G from './game.js?v=28';
-import * as SH from './shop.js?v=28';
-import * as MM from './memes.js?v=28';
-import * as CD from './cards.js?v=28';
-import * as P from './pet.js?v=28';
-import { lineImages, lineScene, loadScenes } from './imagery.js?v=28';
+import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=29';
+import * as S from './store.js?v=29';
+import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=29';
+import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=29';
+import * as G from './game.js?v=29';
+import * as SH from './shop.js?v=29';
+import * as MM from './memes.js?v=29';
+import * as CD from './cards.js?v=29';
+import * as P from './pet.js?v=29';
+import { lineImages, lineScene, loadScenes } from './imagery.js?v=29';
 
 const app = document.getElementById('app');
 const I = {
@@ -451,7 +451,7 @@ function petHeroHTML(bp) {
 }
 let petApi = null, petVoices = new Map(), bubbleTimer;
 async function loadPet(canvas, frame) {
-  const mod = await import('./pet3d.js?v=28');
+  const mod = await import('./pet3d.js?v=29');
   const p = P.pet();
   const seen = Math.min(p.seen ?? petStage(), petStage());
   const api = await mod.mountPet(canvas, { frame, gender: p.g || 'm', stage: seen, hungry: P.hungry(), onTap: () => petTap() });
@@ -600,7 +600,7 @@ VIEWS.pet = () => {
   app.querySelector('#together').onclick = async () => {
     if (!petApi) return;
     stopMic();
-    const { mountLesson } = await import('./lesson.js?v=28');
+    const { mountLesson } = await import('./lesson.js?v=29');
     const panel = app.querySelector('#lesson'), dock = app.querySelector('#pdock');
     dock.hidden = true; panel.hidden = false;
     const poem = S.getPoem(S.state.lastPoem) || S.state.poems[0];
