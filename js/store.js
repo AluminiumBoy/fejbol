@@ -72,7 +72,7 @@ export function makePoem({ title, author, text }) {
 function load() {
   let s = null;
   try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
-  if (s && Array.isArray(s.poems)) return s;
+  if (s && Array.isArray(s.poems)) return withGame(s);
   s = { poems: [], days: {}, settings: { size: 0 } };
   // korábbi (egyszerű) változat verseinek átvétele
   try {
@@ -80,6 +80,11 @@ function load() {
     (old?.texts || []).forEach(t => s.poems.push(makePoem(t)));
   } catch (e) {}
   if (!s.poems.length) s.poems.push(makePoem(SEED));
+  return withGame(s);
+}
+
+function withGame(s) {
+  s.game = Object.assign({ xp: 0, blocks: 0, tasks: 0, perfect: 0, missionsDone: 0, badges: [], mission: { day: '', done: 0, claimed: false } }, s.game || {});
   return s;
 }
 
@@ -102,7 +107,7 @@ export function removePoem(poem) {
 }
 
 // ---- napi statisztika ----
-const dayKey = (t = Date.now()) => { const d = new Date(t); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+export const dayKey = (t = Date.now()) => { const d = new Date(t); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
 export const todayCount = () => state.days[dayKey()] || 0;
 export function streak() {
   let n = 0, t = Date.now();
@@ -135,14 +140,16 @@ export function nextTask(poem, now = Date.now()) {
   return null;
 }
 
+// Visszaad: { pass, mastered: most lett kész egy versszak, wholeDone: az egész vers sikerült }
 export function applyResult(poem, task, score) {
   const now = Date.now(), pass = score >= PASS;
+  let mastered = false, wholeDone = false;
   state.days[dayKey()] = (state.days[dayKey()] || 0) + 1;
   if (task.kind === 'learn') {
     const p = poem.stanzas[task.stanzas[0]];
     if (pass && PATH[p.step] === task.type) {
       p.step++;
-      if (p.step >= PATH.length) { p.due = now + DAY; p.reviews = 0; }
+      if (p.step >= PATH.length) { p.due = now + DAY; p.reviews = 0; mastered = true; }
     }
   } else if (task.kind === 'review') {
     const p = poem.stanzas[task.stanzas[0]];
@@ -152,10 +159,10 @@ export function applyResult(poem, task, score) {
     if (pass) poem.chain = task.chain;
   } else if (task.kind === 'whole') {
     const w = poem.whole;
-    if (pass) { w.due = now + INTERVALS[Math.min(w.reviews, INTERVALS.length - 1)] * DAY; w.reviews++; }
+    if (pass) { w.due = now + INTERVALS[Math.min(w.reviews, INTERVALS.length - 1)] * DAY; w.reviews++; wholeDone = true; }
   }
   save();
-  return pass;
+  return { pass, mastered, wholeDone };
 }
 
 export function setSize(n) {

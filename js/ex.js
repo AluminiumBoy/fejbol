@@ -12,11 +12,12 @@ export const EXERCISES = {
   words:    { name: 'Szókirakó',    short: 'Rakd össze a sort szavakból', help: 'Koppints a szavakra a helyes sorrendben.', icon: 'M3 7h6v4H3zM11 7h10v4H11zM3 14h10v4H3zM15 14h6v4h-6z' },
   hide:     { name: 'Eltűnő szavak', short: 'Egyre több szó tűnik el', help: 'Mondd el hangosan, a hiányzó szavakkal együtt. Ha elakadsz, koppints a szóra.', icon: 'M3 12s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7zM4 4l16 16' },
   initials: { name: 'Kezdőbetűk',   short: 'Csak az első betűk látszanak', help: 'Mondd el hangosan. Csak a kezdőbetűk segítenek, ha kell, koppints a szóra.', icon: 'M5 19l5-14 5 14M7 14h6M17 19V9' },
+  blitz:    { name: 'Villámkör', short: '60 másodperc, gyűjts pontot!', help: 'Válaszolj minél többre 60 másodperc alatt. A rossz válasz 3 másodpercbe kerül.', icon: 'M13 2L4 14h7l-1 8 9-12h-7z', special: true },
   recall:   { name: 'Felmondás',    short: 'Fejből, soronként', help: 'Mondd el fejből a következő sort, aztán nézd meg, jó volt-e.', icon: 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3' }
 };
 
 export function run(type, ui, set, ctx) {
-  return ({ listen, rhyme, cloze, order, words: wordsEx, hide, initials, recall })[type](ui, set, ctx);
+  return ({ blitz, listen, rhyme, cloze, order, words: wordsEx, hide, initials, recall })[type](ui, set, ctx);
 }
 
 // ---------- közös ----------
@@ -217,12 +218,12 @@ function rhyme(ui, set, ctx) {
     ui.dock.querySelectorAll('.opt').forEach(b => b.onclick = () => {
       if (filled) return;
       if (b.dataset.w === it.target) {
-        b.classList.add('right'); filled = true; if (!missed) firstTry++; draw();
+        b.classList.add('right'); ui.sfx('good'); filled = true; if (!missed) firstTry++; draw();
         setTimeout(() => {
           k++; missed = false; filled = false; ui.progress(k / lines.length);
           if (k >= lines.length) ui.finish(firstTry / lines.length); else { draw(); dockDraw(); }
         }, 700);
-      } else { missed = true; b.classList.add('wrong'); b.disabled = true; shake(b); }
+      } else { missed = true; ui.sfx('bad'); b.classList.add('wrong'); b.disabled = true; shake(b); }
     });
   };
   if (!lines.length) return ui.finish(1);
@@ -268,13 +269,13 @@ function cloze(ui, set, ctx) {
     ui.dock.querySelectorAll('.opt').forEach(b => b.onclick = () => {
       if (filled) return;
       if (b.dataset.w === it.target) {
-        b.classList.add('right'); filled = true; if (!missed) firstTry++;
+        b.classList.add('right'); ui.sfx('good'); filled = true; if (!missed) firstTry++;
         draw();
         setTimeout(() => {
           k++; missed = false; filled = false; ui.progress(k / items.length);
           if (k >= items.length) ui.finish(firstTry / items.length); else { draw(); dockDraw(); }
         }, 700);
-      } else { missed = true; b.classList.add('wrong'); b.disabled = true; shake(b); }
+      } else { missed = true; ui.sfx('bad'); b.classList.add('wrong'); b.disabled = true; shake(b); }
     });
   };
   if (!items.length) return ui.finish(1);
@@ -296,14 +297,14 @@ function order(ui, set) {
     ui.body.querySelectorAll('.lcard').forEach(b => b.onclick = () => {
       const c = pool[+b.dataset.n];
       if (c.l === set[si].lines[placed]) {
-        pool[+b.dataset.n] = null; placed++; done++; ui.progress(done / total);
+        pool[+b.dataset.n] = null; ui.sfx('good'); placed++; done++; ui.progress(done / total);
         if (placed >= set[si].lines.length) {
           si++;
           if (si >= set.length) return ui.finish(clamp(1 - mistakes / (total * 2)));
           start();
         }
         draw();
-      } else { mistakes++; b.classList.add('wrong'); shake(b); setTimeout(() => b.classList.remove('wrong'), 600); }
+      } else { mistakes++; ui.sfx('bad'); b.classList.add('wrong'); shake(b); setTimeout(() => b.classList.remove('wrong'), 600); }
     });
   };
   ui.dock.innerHTML = `<p class="muted small" style="margin:0">${EXERCISES.order.help}</p>`;
@@ -336,12 +337,12 @@ function wordsEx(ui, set) {
       const c = chips[+b.dataset.n];
       if (c.used) return;
       if (norm(c.w) === norm(target[placed])) {
-        c.used = true; placed++; done++; ui.progress(done / totalWords);
+        c.used = true; ui.sfx('block'); placed++; done++; ui.progress(done / totalWords);
         if (placed >= target.length) {
           draw();
           setTimeout(() => { k++; if (k >= lines.length) ui.finish(clamp(1 - mistakes / totalWords)); else { start(); draw(); } }, 450);
         } else draw();
-      } else { mistakes++; b.classList.add('wrong'); shake(b); setTimeout(() => b.classList.remove('wrong'), 600); }
+      } else { mistakes++; ui.sfx('bad'); b.classList.add('wrong'); shake(b); setTimeout(() => b.classList.remove('wrong'), 600); }
     });
   };
   start(); draw(); ui.progress(0);
@@ -488,4 +489,61 @@ function recall(ui, set) {
   }
   ui.cleanup(() => { try { rec?.abort(); } catch (e) {} });
   draw(); dockDraw(); ui.progress(0);
+}
+
+// ================= Villámkör (60 mp) =================
+function blitz(ui, set, ctx) {
+  const lines = flat(set), all = ctx.allLines;
+  const TIME = 60;
+  let left = TIME, score = 0, q = null, busy = false, over = false;
+  const pool = [...new Map(ctx.allWords.filter(w => w.length >= 3).map(w => [norm(w), w])).values()];
+
+  function makeQ() {
+    const nextOk = lines.map((_, k) => k).filter(k => k + 1 < lines.length);
+    if (nextOk.length && Math.random() < 0.5) {
+      const k = nextOk[Math.floor(Math.random() * nextOk.length)];
+      const right = lines[k + 1].l;
+      const wrong = shuffle(all.filter(l => l !== right && l !== lines[k].l)).slice(0, 2);
+      return { kind: 'next', prompt: lines[k].l, right, opts: shuffle([right, ...wrong]) };
+    }
+    const x = lines[Math.floor(Math.random() * lines.length)];
+    const tk = tokens(x.l), cand = tk.map((t, j) => ({ ...t, j })).filter(t => t.w && t.w.length >= 3);
+    if (!cand.length) return makeQ();
+    const pick = cand[Math.floor(Math.random() * cand.length)];
+    const others = shuffle(pool.filter(w => norm(w) !== norm(pick.w))).slice(0, 3);
+    const html = tk.map((t, j) => t.t !== undefined ? esc(t.t) : j === pick.j ? '<span class="blank">&nbsp;</span>' : esc(t.w)).join('');
+    return { kind: 'word', html, right: pick.w, opts: shuffle([pick.w, ...others]) };
+  }
+  function draw() {
+    ui.body.innerHTML = `
+      <div class="hud"><span class="px big">${Math.ceil(left)}<small> mp</small></span><span class="px big">${score}<small> pont</small></span></div>
+      <div class="sheet"><div class="poem">${q.kind === 'next'
+        ? `<p class="stanza"><span class="ln">${esc(q.prompt)}</span><span class="ln"><span class="ask">Mi jön utána?</span></span></p>`
+        : `<p class="stanza"><span class="ln hl">${q.html}</span></p>`}</div></div>`;
+    ui.dock.innerHTML = `<div class="${q.kind === 'next' ? 'pool' : 'opts'}">${q.opts.map((o, n) =>
+      `<button class="${q.kind === 'next' ? 'lcard' : 'opt'}" data-n="${n}">${esc(o)}</button>`).join('')}</div>`;
+    ui.dock.querySelectorAll('button').forEach(b => b.onclick = () => answer(b, q.opts[+b.dataset.n]));
+  }
+  function answer(b, o) {
+    if (busy || over) return;
+    if (o === q.right) {
+      score++; ui.sfx('good'); b.classList.add('right'); busy = true;
+      setTimeout(() => { busy = false; if (!over) { q = makeQ(); draw(); } }, 250);
+    } else {
+      left = Math.max(0, left - 3); ui.sfx('bad'); b.classList.add('wrong'); shake(b); busy = true;
+      ui.dock.querySelectorAll('button').forEach(x => { if (q.opts[+x.dataset.n] === q.right) x.classList.add('right'); });
+      setTimeout(() => { busy = false; if (!over) { q = makeQ(); draw(); } }, 700);
+    }
+  }
+  let last = performance.now();
+  const timer = setInterval(() => {
+    const now = performance.now(); left -= (now - last) / 1000; last = now;
+    ui.progress(1 - Math.max(0, left) / TIME);
+    const hud = ui.body.querySelector('.hud .px');
+    if (hud) hud.innerHTML = `${Math.max(0, Math.ceil(left))}<small> mp</small>`;
+    if (left <= 5.2 && left > 0 && Math.abs(left - Math.round(left)) < 0.13) ui.sfx('tick');
+    if (left <= 0 && !over) { over = true; clearInterval(timer); ui.finish(clamp(score / 15), score); }
+  }, 250);
+  ui.cleanup(() => clearInterval(timer));
+  q = makeQ(); draw(); ui.progress(0);
 }
