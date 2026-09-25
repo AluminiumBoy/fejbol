@@ -1,14 +1,14 @@
-import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=35';
-import * as S from './store.js?v=35';
-import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=35';
-import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=35';
-import * as G from './game.js?v=35';
-import * as SH from './shop.js?v=35';
-import * as MM from './memes.js?v=35';
-import * as CD from './cards.js?v=35';
-import * as P from './pet.js?v=35';
-import { lineImages, lineScene, loadScenes } from './imagery.js?v=35';
-import { loadGloss, glossOf, hasGloss, stanzaAbout } from './gloss.js?v=35';
+import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=37';
+import * as S from './store.js?v=37';
+import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=37';
+import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=37';
+import * as G from './game.js?v=37';
+import * as SH from './shop.js?v=37';
+import * as MM from './memes.js?v=37';
+import * as CD from './cards.js?v=37';
+import * as P from './pet.js?v=37';
+import { lineImages, lineScene, loadScenes } from './imagery.js?v=37';
+import { loadGloss, glossOf, hasGloss, stanzaAbout } from './gloss.js?v=37';
 
 const app = document.getElementById('app');
 const I = {
@@ -52,6 +52,7 @@ const stanzaLabel = (idx, n) =>
 
 function taskText(poem, task) {
   const n = poem.stanzas.length, ex = EXERCISES[task.type];
+  if (task.type === 'fix') return { eyebrow: 'Gyenge pontok', title: `Gyenge pontok · ${task.lines?.length || 0} nehéz sor`, sub: 'Csak azokat a sorokat gyakoroljuk, amik még elakadnak.' };
   if (task.kind === 'review') return { eyebrow: 'Ismétlés', title: `${stanzaLabel(task.stanzas, n)} fejből`, sub: 'Megy még? Mondd el soronként.' };
   if (task.kind === 'chain') return { eyebrow: 'Összefűzés', title: stanzaLabel(task.stanzas, n), sub: 'Mondd el egyben az eddig megtanult versszakokat.' };
   if (task.kind === 'whole') return { eyebrow: 'Nagy próba', title: 'Az egész vers fejből', sub: 'Minden versszak megvan. Most egyben!' };
@@ -452,7 +453,7 @@ function petHeroHTML(bp) {
 }
 let petApi = null, petVoices = new Map(), bubbleTimer;
 async function loadPet(canvas, frame) {
-  const mod = await import('./pet3d.js?v=35');
+  const mod = await import('./pet3d.js?v=37');
   const p = P.pet();
   const seen = Math.min(p.seen ?? petStage(), petStage());
   const api = await mod.mountPet(canvas, { frame, gender: p.g || 'm', stage: seen, hungry: P.hungry(), onTap: () => petTap() });
@@ -602,13 +603,14 @@ VIEWS.pet = ({ learn } = {}) => {
   const openLesson = async (learnTask) => {
     if (!petApi) return;
     stopMic();
-    const { mountLesson } = await import('./lesson.js?v=35');
+    const { mountLesson } = await import('./lesson.js?v=37');
     const panel = app.querySelector('#lesson'), dock = app.querySelector('#pdock');
     dock.hidden = true; panel.hidden = false;
     const poem = (learnTask && S.getPoem(learn.id)) || S.getPoem(S.state.lastPoem) || S.state.poems[0];
     const nSt = parseStanzas(poem.text).length;
-    const toLesson = t => ({ stanzas: t.stanzas, level: t.type,
-      label: `${t.kind === 'review' ? 'Ismétlés · ' : t.kind === 'chain' || t.kind === 'whole' ? 'Egyben · ' : ''}${stanzaLabel(t.stanzas, nSt)} · ${EXERCISES[t.type].name}` });
+    const toLesson = t => ({ stanzas: t.stanzas, lines: t.lines, level: t.type,
+      label: t.type === 'fix' ? `Gyenge pontok · ${t.lines?.length || 0} sor`
+        : `${t.kind === 'review' ? 'Ismétlés · ' : t.kind === 'chain' || t.kind === 'whole' ? 'Egyben · ' : ''}${stanzaLabel(t.stanzas, nSt)} · ${EXERCISES[t.type].name}` });
     let current = learnTask;
     let rewards = 0;
     const lesson = mountLesson({
@@ -618,6 +620,7 @@ VIEWS.pet = ({ learn } = {}) => {
       sayUrl: petSayUrl,
       toast,
       about: i => showAbout(i),
+      onLine: ([si, li], ok) => S.recordLine(poem, si, li, ok),
       useMic: S.state.settings.lessonMic === true,
       cleanup: f => cleanups.push(f),
       onReward: () => {
@@ -719,22 +722,28 @@ VIEWS.poem = ({ id, scope = -1 }) => {
       const pill = st === 'new' ? '<span class="pill">Új</span>'
         : st === 'learn' ? `<span class="pill learn">Tanulás ${p.step}/${S.PATH.length}</span>`
           : st === 'due' ? '<span class="pill due">Ismételni</span>' : '<span class="pill done">Megy</span>';
-      return `<div class="srow"><span class="n">${i + 1}.</span><span class="first">${esc(lines[0])}</span>${pill}</div>`;
+      const nw = lines.filter((_, li) => S.weakness(poem, i, li) > 0).length;
+      return `<div class="srow"><span class="n">${i + 1}.</span><span class="first">${esc(lines[0])}</span>${nw ? `<span class="pill weakpill" title="nehéz sorok">${nw} nehéz</span>` : ''}${pill}</div>`;
     }).join('')}</div>
+    ${S.weakLines(poem).length ? `<button class="btn wide weakbtn" id="weak">Gyenge pontok gyakorlása · ${S.weakLines(poem).length} sor</button>` : ''}
     <p class="label">Szabad gyakorlás</p>
     ${n > 1 ? `<div class="chips" id="scope">
       <button class="chip" data-s="-1" aria-pressed="${scope === -1}">Egész</button>
       ${stz.map((_, i) => `<button class="chip" data-s="${i}" aria-pressed="${scope === i}">${i + 1}.</button>`).join('')}
     </div>` : ''}
-    <div class="tiles">${Object.entries(EXERCISES).map(([k, e]) => `
+    <div class="tiles">${Object.entries(EXERCISES).filter(([, e]) => !e.hidden).map(([k, e]) => `
       <button class="tile ${e.special ? 'special' : ''}" data-t="${k}"><svg class="ic" viewBox="0 0 24 24"><path d="${e.icon}"/></svg><b>${e.name}</b><span>${e.short}</span></button>`).join('')}
     </div>
     <details class="stack"><summary class="label" style="cursor:pointer;padding:6px 0">A teljes vers</summary>
-      <div class="sheet"><div class="poem">${stz.map((lines, i) => { const rg = rhymeGroups(lines); return `<p class="stanza">${lines.map((l, li) => `<span class="ln">${li === 0 && n > 1 ? `<span class="snum">${i + 1}.</span>` : ''}${rhymeLine(l, rg[li], hasGloss)}</span>`).join('')}${stanzaAbout(i) ? `<span class="ln"><button class="aboutbtn" data-about="${i}">Miről szól?</button></span>` : ''}</p>`; }).join('')}</div></div>
+      <div class="sheet"><div class="poem">${stz.map((lines, i) => { const rg = rhymeGroups(lines); return `<p class="stanza">${lines.map((l, li) => `<span class="ln">${li === 0 && n > 1 ? `<span class="snum">${i + 1}.</span>` : ''}${rhymeLine(l, rg[li], hasGloss)}${S.weakness(poem, i, li) > 0 ? `<i class="wk" style="--w:${S.weakness(poem, i, li)}" title="nehéz sor"></i>` : ''}</span>`).join('')}${stanzaAbout(i) ? `<span class="ln"><button class="aboutbtn" data-about="${i}">Miről szól?</button></span>` : ''}</p>`; }).join('')}</div></div>
     </details>`;
   app.querySelector('#back').onclick = () => go('home');
   app.querySelector('#edit').onclick = () => go('edit', { id });
   app.querySelector('#go')?.addEventListener('click', () => startTask(poem, task));
+  app.querySelector('#weak')?.addEventListener('click', () => {
+    const w = S.weakLines(poem);
+    startTask(poem, { type: 'fix', stanzas: [...new Set(w.map(x => x.si))], lines: w.map(x => [x.si, x.li]), kind: 'free' });
+  });
   app.querySelectorAll('#scope .chip').forEach(b => b.onclick = () => go('poem', { id, scope: +b.dataset.s }, false));
   app.querySelectorAll('.tile').forEach(b => b.onclick = () => {
     if (b.dataset.t === 'blitz') return startTask(poem, blitzTask(poem, scope));
@@ -744,7 +753,7 @@ VIEWS.poem = ({ id, scope = -1 }) => {
 };
 
 // a tanulás fő útja a nagy rókánál folyik; a többi feladat a saját képernyőjén
-const LESSON_TYPES = ['echo', 'alt', 'solo'];
+const LESSON_TYPES = ['echo', 'alt', 'solo', 'fix'];
 function startTask(poem, task) {
   if (LESSON_TYPES.includes(task.type)) { if (!P.pet().g) P.setGender('m'); go('pet', { learn: { id: poem.id, task } }); }
   else go('exercise', { id: poem.id, task });
@@ -808,6 +817,7 @@ VIEWS.exercise = ({ id, task }) => {
       if (kind === 'good' && streakRun === 3) pal.say('combo', 'Hű, egymás után mind jó!');
     },
     pet: pal,
+    mark: (si, li, ok) => S.recordLine(poem, si, li, ok),
     // egyszeri tipp
     tip: (id, msg) => { const seen = S.state.settings.tips || (S.state.settings.tips = {}); if (seen[id]) return; seen[id] = 1; S.save(); toast(msg); },
     finish: (score, raw) => {

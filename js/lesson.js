@@ -1,10 +1,10 @@
 // "Tanuljunk együtt": beszélgetős tanulás a nagy rókával.
 // 1. Mondd utánam  2. Folytasd (felváltva)  3. Egyedül. A róka felolvas, figyel, ellenőriz, dicsér.
-import { parseStanzas, esc, words, matchSpoken, rhymeLine } from './text.js?v=35';
-import { lineScene, lineImages } from './imagery.js?v=35';
-import { hasGloss } from './gloss.js?v=35';
+import { parseStanzas, esc, words, matchSpoken, rhymeLine } from './text.js?v=37';
+import { lineScene, lineImages } from './imagery.js?v=37';
+import { hasGloss } from './gloss.js?v=37';
 
-const LEVELS = { echo: 'Mondd utánam', alt: 'Folytasd', solo: 'Egyedül' };
+const LEVELS = { echo: 'Mondd utánam', alt: 'Folytasd', solo: 'Egyedül', fix: 'Gyenge pontok' };
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 let lineIdx = null;
@@ -21,7 +21,9 @@ export function mountLesson(deps) {
   let si = 0, level = 'echo', running = false, runId = 0;
   // irányított mód: az app adja a feladatot ({ stanzas, level, label }), a végén onFinished-del jelez
   let task = null;
-  const curLines = () => task ? task.stanzas.flatMap(i => stanzas[i] || []) : stanzas[si];
+  // a gyakorolt sorok helye a versben: [versszak, sor]
+  const curRefs = () => task?.lines ? task.lines : (task ? task.stanzas : [si]).flatMap(s => (stanzas[s] || []).map((_, li) => [s, li]));
+  const curLines = () => curRefs().map(([s, li]) => stanzas[s]?.[li]).filter(Boolean);
   let stream = null, micAn = null, micCtx = null;
   const bufs = new Map();
   // soronkénti állapot a kijelzéshez: 'show' | 'hide' | 'ok' | 'miss', és az aktuális sor
@@ -104,7 +106,7 @@ export function mountLesson(deps) {
   async function run() {
     const my = ++runId; running = true;
     pet()?.setFocus?.(true);
-    const lines = curLines();
+    const lines = curLines(), refs = curRefs();
     const alive = () => my === runId;
     if (micOn() && !(await micReady())) deps.toast('Nincs mikrofon: a "Kész" gombbal jelezd, ha elmondtad.');
     states = lines.map(() => level === 'echo' ? 'show' : 'hide'); cur = -1; draw();
@@ -112,19 +114,22 @@ export function mountLesson(deps) {
     let turns;
     if (level === 'echo') turns = lines.flatMap((_, i) => [['fox', i], ['kid', i]]);
     else if (level === 'alt') turns = [...lines.map((_, i) => [i % 2 ? 'kid' : 'fox', i]), ...lines.map((_, i) => [i % 2 ? 'fox' : 'kid', i])];
+    else if (level === 'fix') turns = lines.flatMap((_, i) => [['fox', i], ['kid', i, 'echo'], ['kid', i]]);
     else turns = lines.map((_, i) => ['kid', i]);
-    await sayKey(level === 'echo' ? 'repeat' : level === 'alt' ? 'continue' : 'solo', LEVELS[level] + '!');
+    await sayKey({ echo: 'repeat', alt: 'continue', solo: 'solo', fix: 'weak' }[level], LEVELS[level] + '!');
+    const missed = new Set();
     let good = 0, kidTurns = 0, round2 = level === 'alt' ? lines.length : Infinity;
     for (let n = 0; n < turns.length && alive(); n++) {
-      const [w, i] = turns[n], l = lines[i];
+      const [w, i, mode] = turns[n], l = lines[i];
+      const echoTurn = level === 'echo' || mode === 'echo';
       if (n === round2) { states = lines.map(() => 'hide'); draw(); }
       cur = i; who = w;
       if (w === 'fox') {
         states[i] = 'show'; draw();
         await foxSays(l);
       } else {
-        kidTurns++;
-        if (level !== 'echo') states[i] = 'hide';
+        if (!echoTurn || level === 'echo') kidTurns++;
+        states[i] = echoTurn ? 'show' : 'hide';
         who = 'kid'; draw();
         pet()?.setListening(true);
         manualSkip = false;
@@ -133,7 +138,8 @@ export function mountLesson(deps) {
         manualDone = null;
         if (!alive()) break;
         let ok = res.spoke && !manualSkip && (res.ratio == null || res.ratio >= .65);
-        if (level !== 'echo' || manualSkip) {
+        if (!echoTurn) { deps.onLine?.(refs[i], ok); if (!ok) missed.add(i); }
+        if (!echoTurn || manualSkip) {
           // a róka megmutatja és elmondja a helyes sort
           states[i] = ok ? 'ok' : 'miss'; draw();
           if (!ok || res.ratio == null) await foxSays(l);
@@ -143,6 +149,21 @@ export function mountLesson(deps) {
         else { pet()?.react('bad'); if (res.spoke) await sayKey('tryagain', 'Majdnem! Próbáld újra!'); }
       }
       await wait(250);
+    }
+    // azonnali javítás: a hibás sorok még egyszer (a róka mondja, te utána, aztán egyedül); nem számít a pontba
+    if (alive() && missed.size && level !== 'fix') {
+      await sayKey('redo', 'Ezeket vegyük át még egyszer!');
+      for (const i of missed) {
+        if (!alive()) break;
+        cur = i; who = 'fox'; states[i] = 'show'; draw(); await foxSays(lines[i]);
+        manualSkip = false; who = 'kid'; draw(); pet()?.setListening(true); await listen(lines[i], my); pet()?.setListening(false);
+        if (!alive()) break;
+        manualSkip = false; states[i] = 'hide'; who = 'kid'; draw(); pet()?.setListening(true); const r2 = await listen(lines[i], my); pet()?.setListening(false);
+        if (!alive()) break;
+        const ok2 = r2.spoke && !manualSkip && (r2.ratio == null || r2.ratio >= .65); manualSkip = false;
+        states[i] = ok2 ? 'ok' : 'miss'; draw(); deps.onLine?.(refs[i], ok2);
+        if (ok2) pet()?.react('good'); else await foxSays(lines[i]);
+      }
     }
     if (!alive()) return;
     running = false; cur = -1; pet()?.setFocus?.(false);

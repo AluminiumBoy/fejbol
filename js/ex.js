@@ -2,9 +2,9 @@
 //   ui  = { body, dock, progress(0..1), finish(score), cleanup(fn), toast(msg) }
 //   set = [{ i: versszak sorszáma, lines: [...] }]
 //   ctx = { allWords: a vers összes szava (tippekhez) }
-import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=35';
-import { lineImages, lineScene, hasHint } from './imagery.js?v=35';
-import { hasGloss } from './gloss.js?v=35';
+import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=37';
+import { lineImages, lineScene, hasHint } from './imagery.js?v=37';
+import { hasGloss } from './gloss.js?v=37';
 
 export const EXERCISES = {
   listen:   { name: 'Meghallgatás', short: 'Hallgasd meg és olvasd fel', help: 'Hallgasd meg, aztán olvasd fel hangosan te is.', icon: 'M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4' },
@@ -17,6 +17,7 @@ export const EXERCISES = {
   blitz:    { name: 'Speedrun', short: '60 mp, dönts rekordot', help: 'Válaszolj minél többre 60 másodperc alatt. A rossz válasz 3 másodpercbe kerül.', icon: 'M13 2L4 14h7l-1 8 9-12h-7z', special: true },
   echo:     { name: 'Mondd utánam', short: 'A róka mondja, te utána', help: 'A róka elmond egy sort, te utána mondod.', icon: 'M4 12h10M10 6l6 6-6 6M20 5v14' },
   alt:      { name: 'Folytasd', short: 'Felváltva a rókával', help: 'Felváltva mondjátok: egy sor a rókáé, a következő a tiéd.', icon: 'M7 7h10M7 12h6M7 17h10' },
+  fix:      { name: 'Gyenge pontok', short: 'Ami még nem megy', help: 'Csak azokat a sorokat gyakoroljuk, amik még elakadnak.', icon: 'M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z', hidden: true },
   solo:     { name: 'Egyedül', short: 'Fejből, a róka figyel', help: 'Mondd el fejből, a róka figyel és ellenőriz.', icon: 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3' },
   rap:      { name: 'Rap mód', short: 'Rappeld el ütemre', help: 'Szól az ütem: rappeld a verset a rókával!', icon: 'M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z', special: true },
   recall:   { name: 'Felmondás',    short: 'Fejből, soronként', help: 'Mondd el fejből a következő sort, aztán nézd meg, jó volt-e.', icon: 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3' }
@@ -308,6 +309,7 @@ function cloze(ui, set, ctx) {
       if (filled) return;
       if (b.dataset.w === it.target) {
         b.classList.add('right'); ui.sfx('good'); filled = true; if (!missed) firstTry++;
+        ui.mark?.(it.si, it.li, !missed);
         draw();
         setTimeout(() => {
           k++; missed = false; filled = false; ui.progress(k / items.length);
@@ -520,7 +522,8 @@ function recall(ui, set, ctx) {
   }
   function step(ok) {
     if (!heard) ui.pet?.react(ok ? 'good' : 'bad');
-    marks[k] = ok && hint < 2; k++; shown = false; hint = 0; heard = null; ui.pet?.think(null);
+    marks[k] = ok && hint < 2;
+    ui.mark?.(lines[k].si, lines[k].li, marks[k]); k++; shown = false; hint = 0; heard = null; ui.pet?.think(null);
     ui.progress(k / lines.length);
     if (k >= lines.length) return ui.finish(marks.filter(Boolean).length / lines.length);
     draw(); dockDraw();

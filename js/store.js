@@ -1,5 +1,5 @@
 // Tárolás (a böngészőben) és a tanulási út ütemezése
-import { parseStanzas } from './text.js?v=35';
+import { parseStanzas } from './text.js?v=37';
 
 const KEY = 'fejbol.v3';
 const DAY = 864e5;
@@ -129,6 +129,24 @@ export function removePoem(poem) {
   save();
 }
 
+// ---- hibatérkép: soronként hányszor ment és hányszor nem ----
+export function recordLine(poem, si, li, ok) {
+  const w = poem.weak || (poem.weak = {}), k = si + '.' + li;
+  const e = w[k] || (w[k] = { miss: 0, ok: 0 });
+  if (ok) e.ok++; else e.miss++;
+  e.t = Date.now(); save();
+}
+// a nehéz sorok: többször nem ment, mint amennyiszer igen (a friss hibák többet számítanak)
+export function weakLines(poem, max = 6) {
+  const out = [];
+  for (const [k, e] of Object.entries(poem.weak || {})) {
+    const score = e.miss * 1.5 - e.ok;
+    if (e.miss > 0 && score > 0) { const [si, li] = k.split('.').map(Number); out.push({ si, li, score }); }
+  }
+  return out.sort((a, b) => b.score - a.score).slice(0, max);
+}
+export const weakness = (poem, si, li) => { const e = poem.weak?.[si + '.' + li]; return e ? Math.max(0, Math.min(1, (e.miss * 1.5 - e.ok) / 4)) : 0; };
+
 // ---- napi statisztika ----
 export const dayKey = (t = Date.now()) => { const d = new Date(t); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
 export const todayCount = () => state.days[dayKey()] || 0;
@@ -150,6 +168,9 @@ export function nextTask(poem, now = Date.now()) {
   const st = poem.stanzas;
   const due = st.findIndex(p => p.step >= PATH.length && p.due <= now);
   if (due >= 0) return { type: 'solo', stanzas: [due], kind: 'review' };
+  // gyenge pontok célzott gyakorlása (naponta egyszer, ha legalább 2 nehéz sor van)
+  const weak = weakLines(poem);
+  if (weak.length >= 2 && poem.weakDay !== dayKey()) return { type: 'fix', stanzas: [...new Set(weak.map(w => w.si))], lines: weak.map(w => [w.si, w.li]), kind: 'weak' };
 
   let prefix = 0;
   while (prefix < st.length && st[prefix].step >= PATH.length) prefix++;
@@ -178,6 +199,8 @@ export function applyResult(poem, task, score) {
     const p = poem.stanzas[task.stanzas[0]];
     if (pass) { p.due = now + INTERVALS[Math.min(p.reviews, INTERVALS.length - 1)] * DAY; p.reviews++; }
     else { p.step = PATH.indexOf('alt'); p.due = 0; }
+  } else if (task.kind === 'weak') {
+    poem.weakDay = dayKey();
   } else if (task.kind === 'chain') {
     if (pass) poem.chain = task.chain;
   } else if (task.kind === 'whole') {
