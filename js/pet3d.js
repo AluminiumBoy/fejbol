@@ -278,6 +278,8 @@ export async function mountPet(canvas, opts = {}) {
   }
   const setListening = on => { S.listenTo = on ? 1 : 0; };
   // fókusz mód tanulás közben: nincs magától ásítás/körülnézés, a háttér fényei elhalványulnak
+  // tanár mód (felelés-próba): szemüveg fel
+  const setTeacher = on => { S.teacher = on; glasses.visible = on || S.stage === 2; };
   const setFocus = on => {
     S.focus = on; if (on) { S.yawnT = -1; S.lookTo.set(0, 0); }
     bokeh.forEach(b => b.material.opacity = on ? .12 : (S.asleep ? .15 : .45));
@@ -391,7 +393,7 @@ export async function mountPet(canvas, opts = {}) {
   raf = requestAnimationFrame(tick);
 
   return {
-    setGender, setStage, setMood, setSleep, poke, eat, speak, audio, jump, happy, hearts, sparkle, attach, react, setListening, pulse, mouth, setFocus,
+    setGender, setStage, setMood, setSleep, poke, eat, speak, audio, jump, happy, hearts, sparkle, attach, react, setListening, pulse, mouth, setFocus, setTeacher,
     isAsleep: () => S.asleep,
     dispose() {
       alive = false; cancelAnimationFrame(raf); io.disconnect(); ro.disconnect();

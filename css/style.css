@@ -703,3 +703,19 @@ img.tc-img.sil{filter:brightness(0) opacity(.45);background:none}
 .wk{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:8px;vertical-align:middle;background:rgba(255,77,94,calc(.35 + var(--w) * .65));box-shadow:0 0 calc(var(--w) * 10px) rgba(255,77,94,.8)}
 .pill.weakpill{background:var(--bad-soft);color:var(--bad)}
 .btn.weakbtn{border-color:rgba(255,77,94,.5);color:#FF9AA5}
+
+/* ===== felelés-próba ===== */
+.exam{position:relative;display:flex;flex-direction:column;gap:10px;background:rgba(16,12,30,.8);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.14);border-radius:20px;padding:16px}
+.exclose{position:absolute;right:10px;top:10px;min-height:36px;padding:4px 12px}
+.exnum{margin:0;color:var(--muted);font-size:.85rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.exq{margin:0;font-family:var(--px);font-size:1.7rem;line-height:1.15;text-transform:uppercase;color:#fff;padding-right:44px}
+.excue{margin:0;font-family:var(--poem);font-size:1.15rem;color:#FFE08A}
+.exans{font-family:var(--poem);font-size:1.08rem;line-height:1.4;background:rgba(255,255,255,.07);border-radius:12px;padding:8px 12px;max-height:30vh;overflow:auto}
+.exans p{margin:0}
+.exgrade{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px}
+.exgrade .px{font-size:5rem;line-height:1}
+.exgrade .g5,.exgrade .g4{color:var(--pen);text-shadow:0 0 30px rgba(198,255,61,.5)}
+.exgrade .g3{color:var(--gold)}
+.exgrade .g2,.exgrade .g1{color:var(--bad)}
+.exgrade b{font-size:1.3rem}
+.btn.examopen{min-height:48px;background:rgba(28,20,48,.62);border-color:rgba(255,255,255,.18);font-weight:800}
