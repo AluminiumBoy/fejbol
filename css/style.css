@@ -665,3 +665,22 @@ img.tc-img.sil{filter:brightness(0) opacity(.45);background:none}
 .btn.rapbtn{align-self:center;min-height:40px;font-size:1rem;letter-spacing:.06em;background:linear-gradient(135deg,#6A2BD9,#FF3DA5);border:0;color:#fff;padding-inline:22px;box-shadow:0 6px 18px -8px rgba(255,61,165,.8)}
 .thought.scene{font-size:.95rem;font-weight:800;line-height:1.3;color:#1B1030;max-width:min(260px,62vw);padding:10px 14px;border-radius:18px;top:56px}
 .ask .pics{font-size:1rem;letter-spacing:0;white-space:normal}
+
+/* ===== Tanuljunk együtt (nagy róka) ===== */
+.btn.go.together{background:linear-gradient(135deg,#FFB547,#FF6A3D);color:#2A0F05;box-shadow:0 6px 0 #B84A1E,0 0 30px -8px #FF6A3D}
+.lessonpanel{gap:10px}
+.lessonbar{display:flex;flex-direction:column;gap:6px}
+.lchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.lchips::-webkit-scrollbar{display:none}
+.lchips .chip{flex:none;background:rgba(28,20,48,.62);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.lsheet{display:flex;flex-direction:column;gap:4px;background:rgba(16,12,30,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:10px 12px;max-height:34vh;overflow:auto}
+.lline{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:12px;font-family:var(--poem);font-size:1.12rem;line-height:1.35;color:rgba(255,255,255,.7);transition:background .2s}
+.lline .mask{color:rgba(255,255,255,.35);letter-spacing:.12em}
+.lline.cur{background:rgba(255,255,255,.1);color:#fff}
+.lline.cur.kid{background:rgba(198,255,61,.14);box-shadow:inset 0 0 0 1px rgba(198,255,61,.5)}
+.lline.ok .lt{color:#9CF28A}
+.lline.miss .lt{color:#FF9AA5}
+.lline .turn{flex:none;font-family:var(--ui);font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;background:var(--pen);color:#0B0D12;border-radius:6px;padding:2px 6px}
+.lline .turn.fox{background:#FFB547}
+.lessonpanel .row .btn{min-height:52px}
+.lessonpanel .btn.go{font-size:1.2rem;min-height:56px}

@@ -1,5 +1,5 @@
 // Offline működés: saját fájlok hálózatról (friss), ha nincs net, a tárolt másolatból.
-const CACHE = 'fejbol-v25';
+const CACHE = 'fejbol-v28';
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(
   caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())
