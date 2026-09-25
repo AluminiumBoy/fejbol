@@ -5,16 +5,17 @@ export const MISSION_SIZE = 3;
 
 // ---------- szintek ----------
 const LEVELS = [0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200, 4000, 5000];
-const LEVEL_NAMES = ['Újonc', 'Felfedező', 'Kalandor', 'Bányász', 'Építő', 'Lovag', 'Mesterépítő', 'Bajnok', 'Hős', 'Legenda', 'Versmester', 'Nagymester'];
 export function levelInfo(xp = state.game.xp) {
+  const LEVEL_NAMES = world().levels;
   let l = 0; while (l + 1 < LEVELS.length && xp >= LEVELS[l + 1]) l++;
   const base = LEVELS[l], next = LEVELS[l + 1] ?? base + 1500;
   return { lvl: l + 1, name: LEVEL_NAMES[l] || 'Nagymester', cur: xp - base, need: next - base, frac: (xp - base) / (next - base) };
 }
 
-// ---------- építkezés ----------
+// ---------- világok ----------
+// A csillagokból gyűlő pontok (state.game.blocks) mindhárom világban ugyanazok, csak a megjelenés más.
 // . üres, S kő, W ablak, G kapu, F zászló, P rúd, R tető
-export const BUILDS = [
+const BUILDS = [
   { name: 'Vár', rows: [
     '...F........F...',
     '...P........P...',
@@ -40,14 +41,58 @@ export const BUILDS = [
     '.....SSSSS......',
     '.....SSGSS......'] }
 ];
-export const buildSize = b => b.rows.join('').replace(/\./g, '').length;
+const cellsOf = b => b.rows.join('').replace(/\./g, '').length;
 
-// hányadik építménynél tart, és abban hány blokk van kész
-export function buildProgress(blocks = state.game.blocks) {
+export const WORLDS = {
+  build: {
+    name: 'Építő', desc: 'Blokkokból vár és torony épül', unit: 'blokk',
+    levels: ['Újonc', 'Felfedező', 'Kalandor', 'Bányász', 'Építő', 'Lovag', 'Mesterépítő', 'Bajnok', 'Hős', 'Legenda', 'Versmester', 'Nagymester'],
+    stage: i => { const b = BUILDS[i % BUILDS.length]; return { ...b, size: cellsOf(b), name: i >= BUILDS.length ? `${b.name} (${Math.floor(i / BUILDS.length) + 1}.)` : b.name }; },
+    label: st => `Építkezés: ${st.name}`,
+    hint: 'Minden csillag egy blokk. Tanulj, és felépül!',
+    done: st => `Felépült: ${st.name}!`, next: 'Kezdődik a következő építkezés.',
+    badge: { name: 'Építőmester', desc: 'Az első építmény kész' },
+    draw: drawBuild
+  },
+  car: {
+    name: 'Autós', desc: 'Versenyzés, minden csillag 1 km', unit: 'km',
+    levels: ['Tanuló vezető', 'Gokartos', 'Utcai versenyző', 'Rali pilóta', 'Pályaversenyző', 'Profi pilóta', 'Csapatkapitány', 'Bajnok', 'Világbajnok', 'Legenda', 'Versmester', 'Nagymester'],
+    stage: i => ({ name: `${i + 1}. futam`, size: Math.min(40 + i * 10, 100), n: i }),
+    label: st => `Verseny: ${st.name}`,
+    hint: 'Minden csillag 1 km. Érj célba!',
+    done: st => `Célba értél: ${st.name}!`, next: 'Indul a következő futam, kicsit hosszabb pályán.',
+    badge: { name: 'Első futam', desc: 'Először értél célba' },
+    draw: drawRace
+  },
+  foot: {
+    name: 'Focis', desc: 'Meccsek és kupák, minden csillag egy gól', unit: 'gól',
+    levels: ['Újonc', 'Utánpótlás', 'Csapattag', 'Kezdő tizenegy', 'Csapatkapitány', 'Gólvágó', 'Gólkirály', 'Válogatott', 'Világsztár', 'Legenda', 'Versmester', 'Nagymester'],
+    stage: i => ({ name: `${i + 1}. meccs`, size: Math.min(12 + i * 3, 30), n: i }),
+    label: st => `Bajnokság: ${st.name}`,
+    hint: 'Minden csillag egy gól. Nyerd meg a meccset!',
+    done: st => `Megnyerted: ${st.name}!`, next: 'Jön a következő meccs, erősebb ellenféllel.',
+    badge: { name: 'Első győzelem', desc: 'Az első meccs megnyerve' },
+    draw: drawMatch
+  }
+};
+export const world = () => WORLDS[state.settings.world] || WORLDS.build;
+
+// hányadik szakasznál tart, és abban mennyi van kész
+export function buildProgress(blocks = state.game.blocks, w = world()) {
   let i = 0, left = blocks;
-  while (left >= buildSize(BUILDS[i % BUILDS.length])) { left -= buildSize(BUILDS[i % BUILDS.length]); i++; }
-  const b = BUILDS[i % BUILDS.length];
-  return { index: i, build: b, placed: left, size: buildSize(b), finished: i };
+  while (left >= w.stage(i).size) { left -= w.stage(i).size; i++; }
+  const st = w.stage(i);
+  return { index: i, stage: st, build: st, placed: left, size: st.size, finished: i };
+}
+export const drawProgress = (canvas, prog, fresh = 0, w = world()) => w.draw(canvas, prog, fresh);
+
+function setup(canvas, W, H) {
+  const css = canvas.clientWidth || 320, px = Math.floor(css / W);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W * px * dpr; canvas.height = H * px * dpr;
+  canvas.style.height = (H * px) + 'px';
+  const g = canvas.getContext('2d'); g.scale(dpr, dpr); g.imageSmoothingEnabled = false;
+  return { g, px };
 }
 
 const COLORS = { S: '#8E949E', W: '#35507F', G: '#7A4B26', F: '#D6453D', P: '#5B3A1E', R: '#B5452F' };
@@ -56,37 +101,107 @@ function shade(hex, f) {
   const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.max(0, Math.min(255, Math.round(v * f))));
   return `rgb(${c.join(',')})`;
 }
-// build order: alulról felfelé, balról jobbra
-export function drawBuild(canvas, prog, highlightNew = 0) {
-  const { build, placed } = prog;
+function block(g, x, y, px, col) {
+  const e = Math.max(2, px / 7);
+  g.fillStyle = col; g.fillRect(x, y, px, px);
+  g.fillStyle = shade(col, 1.25); g.fillRect(x, y, px, e); g.fillRect(x, y, e, px);
+  g.fillStyle = shade(col, 0.7); g.fillRect(x, y + px - e, px, e); g.fillRect(x + px - e, y, e, px);
+}
+
+// Építő: alulról felfelé, balról jobbra
+function drawBuild(canvas, prog, fresh = 0) {
+  const { stage: build, placed } = prog;
   const rows = build.rows, W = 16, H = rows.length + 1;
-  const css = canvas.clientWidth || 320, px = Math.floor(css / W);
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = W * px * dpr; canvas.height = H * px * dpr;
-  canvas.style.height = (H * px) + 'px';
-  const g = canvas.getContext('2d'); g.scale(dpr, dpr);
+  const { g, px } = setup(canvas, W, H);
   const cells = [];
   for (let r = rows.length - 1; r >= 0; r--) for (let c = 0; c < W; c++) if (rows[r][c] !== '.') cells.push([r, c, rows[r][c]]);
   const ghost = getComputedStyle(document.documentElement).getPropertyValue('--line').trim() || '#ccc';
   cells.forEach(([r, c, t], k) => {
     const x = c * px, y = r * px;
     if (k < placed) {
-      g.fillStyle = COLORS[t]; g.fillRect(x, y, px, px);
-      g.fillStyle = shade(COLORS[t], 1.25); g.fillRect(x, y, px, Math.max(2, px / 7)); g.fillRect(x, y, Math.max(2, px / 7), px);
-      g.fillStyle = shade(COLORS[t], 0.7); g.fillRect(x, y + px - Math.max(2, px / 7), px, Math.max(2, px / 7)); g.fillRect(x + px - Math.max(2, px / 7), y, Math.max(2, px / 7), px);
+      block(g, x, y, px, COLORS[t]);
       if (t === 'W') { g.fillStyle = '#F2C14E'; g.fillRect(x + px * .3, y + px * .3, px * .4, px * .4); }
-      if (k >= placed - highlightNew) { g.strokeStyle = '#F2C14E'; g.lineWidth = 2; g.strokeRect(x + 1, y + 1, px - 2, px - 2); }
+      if (k >= placed - fresh) { g.strokeStyle = '#F2C14E'; g.lineWidth = 2; g.strokeRect(x + 1, y + 1, px - 2, px - 2); }
     } else {
       g.strokeStyle = ghost; g.lineWidth = 1; g.setLineDash([2, 2]); g.strokeRect(x + .5, y + .5, px - 1, px - 1); g.setLineDash([]);
     }
   });
-  // fű és föld
   const y = rows.length * px;
   for (let c = 0; c < W; c++) {
     g.fillStyle = '#6B4A2B'; g.fillRect(c * px, y, px, px);
     g.fillStyle = '#5BAA3C'; g.fillRect(c * px, y, px, px * .35);
     g.fillStyle = '#4A8F30'; g.fillRect(c * px + (c % 3) * px / 4, y + px * .35, px / 4, px / 6);
   }
+}
+
+// Autós: az autó a pálya elejétől a célig halad
+const CAR_COLORS = ['#D6453D', '#2F6FD6', '#E8A317', '#2E9E5B', '#8A4FD8', '#E0662B'];
+function car(g, x, y, u, col, alpha = 1) {
+  g.globalAlpha = alpha;
+  g.fillStyle = col; g.fillRect(x, y + u * 2, u * 10, u * 3); g.fillRect(x + u * 2, y, u * 5, u * 2);
+  g.fillStyle = '#BFE3FF'; g.fillRect(x + u * 3, y + u * .5, u * 1.6, u * 1.5); g.fillRect(x + u * 5, y + u * .5, u * 1.6, u * 1.5);
+  g.fillStyle = shade(col, .7); g.fillRect(x, y + u * 4, u * 10, u);
+  g.fillStyle = '#FFE08A'; g.fillRect(x + u * 9.2, y + u * 2.5, u * .8, u * .8);
+  g.fillStyle = '#1B1F27'; g.fillRect(x + u * 1.5, y + u * 4.2, u * 2, u * 2); g.fillRect(x + u * 6.5, y + u * 4.2, u * 2, u * 2);
+  g.fillStyle = '#9AA1AD'; g.fillRect(x + u * 2.2, y + u * 4.9, u * .6, u * .6); g.fillRect(x + u * 7.2, y + u * 4.9, u * .6, u * .6);
+  g.globalAlpha = 1;
+}
+function drawRace(canvas, prog, fresh = 0) {
+  const W = 40, H = 18;
+  const { g, px } = setup(canvas, W, H);
+  const w = W * px, road = 9 * px, rh = 6 * px;
+  g.fillStyle = '#8FD0F5'; g.fillRect(0, 0, w, road);
+  g.fillStyle = '#FFFFFF'; [[4, 2], [22, 3], [33, 1.5]].forEach(([cx, cy]) => { g.fillRect(cx * px, cy * px, px * 4, px); g.fillRect((cx + 1) * px, (cy - 1) * px, px * 2, px); });
+  g.fillStyle = '#5BAA3C'; g.fillRect(0, road - px * 2, w, px * 2);
+  for (let t = 0; t < W; t += 6) { g.fillStyle = '#3F7F2A'; g.fillRect((t + 2) * px, road - px * 5, px * 2, px * 3); g.fillStyle = '#6B4A2B'; g.fillRect((t + 2.6) * px, road - px * 2, px * .8, px * 2); }
+  g.fillStyle = '#3A3F4A'; g.fillRect(0, road, w, rh);
+  g.fillStyle = '#F2F2F2'; for (let x = 0; x < W; x += 3) g.fillRect(x * px, road + rh / 2 - px * .25, px * 1.6, px * .5);
+  g.fillStyle = '#D6453D'; for (let x = 0; x < W; x += 2) g.fillRect(x * px, road, px, px * .5);
+  g.fillStyle = '#5BAA3C'; g.fillRect(0, road + rh, w, H * px - road - rh);
+  // cél: kockás csík
+  const fx = (W - 3) * px;
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 2; c++) { g.fillStyle = (r + c) % 2 ? '#111' : '#fff'; g.fillRect(fx + c * px, road + r * px, px, px); }
+  g.fillStyle = '#5B3A1E'; g.fillRect(fx + px * .5, road - px * 5, px * .5, px * 5);
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) { g.fillStyle = (r + c) % 2 ? '#111' : '#fff'; g.fillRect(fx + px + c * px * .8, road - px * 5 + r * px * .8, px * .8, px * .8); }
+  // km jelzők
+  g.fillStyle = '#FFFFFF'; g.font = `700 ${Math.max(9, px * 1.1)}px system-ui,sans-serif`; g.textAlign = 'center';
+  const start = 1, span = W - 3 - start - 10;
+  for (let k = 0; k <= 4; k++) { const x = (start + span * k / 4 + 5) * px; g.fillText(`${Math.round(prog.size * k / 4)}`, x, (H - .6) * px); }
+  const col = CAR_COLORS[(prog.stage.n || 0) % CAR_COLORS.length];
+  const at = f => (start + span * Math.min(1, f)) * px;
+  if (fresh) car(g, at((prog.placed - fresh) / prog.size), road + px * .6, px * .5, col, .3);
+  car(g, at(prog.placed / prog.size), road + px * .6, px * .5, col);
+}
+
+// Focis: a labda a kapu felé halad, a gólok golyóként gyűlnek
+function drawMatch(canvas, prog, fresh = 0) {
+  const W = 40, H = 20;
+  const { g, px } = setup(canvas, W, H);
+  for (let c = 0; c < W; c += 4) { g.fillStyle = (c / 4) % 2 ? '#3E9A45' : '#47A94E'; g.fillRect(c * px, 0, 4 * px, H * px); }
+  g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = Math.max(2, px * .3);
+  g.strokeRect(px, px, (W - 2) * px, (H - 2) * px);
+  g.beginPath(); g.moveTo(W / 2 * px, px); g.lineTo(W / 2 * px, (H - 1) * px); g.stroke();
+  g.beginPath(); g.arc(W / 2 * px, H / 2 * px, 3.5 * px, 0, Math.PI * 2); g.stroke();
+  g.strokeRect((W - 7) * px, (H / 2 - 5) * px, 6 * px, 10 * px);
+  // kapu és háló
+  g.fillStyle = 'rgba(255,255,255,.9)'; g.fillRect((W - 1) * px, (H / 2 - 3) * px, px, 6 * px);
+  g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 1;
+  for (let y = H / 2 - 3; y <= H / 2 + 3; y += .75) { g.beginPath(); g.moveTo((W - 1) * px, y * px); g.lineTo(W * px, y * px); g.stroke(); }
+  // eredményjelző
+  g.fillStyle = 'rgba(15,20,30,.78)'; g.fillRect(1.6 * px, 1.6 * px, 11 * px, 3.4 * px);
+  g.fillStyle = '#fff'; g.font = `800 ${Math.max(11, px * 2)}px system-ui,sans-serif`; g.textAlign = 'left';
+  g.fillText(`${prog.placed} / ${prog.size}`, 2.4 * px, 4.2 * px);
+  // labda útja
+  const f = prog.placed / prog.size;
+  const bx = (3 + (W - 7) * f) * px, by = (H / 2 + Math.sin(f * Math.PI * 3) * 3) * px;
+  if (fresh) { const f0 = (prog.placed - fresh) / prog.size; g.globalAlpha = .3; ball(g, (3 + (W - 7) * f0) * px, (H / 2 + Math.sin(f0 * Math.PI * 3) * 3) * px, px); g.globalAlpha = 1; }
+  ball(g, bx, by, px);
+}
+function ball(g, x, y, px) {
+  const r = px * 1.3;
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#1B1F27'; g.beginPath(); g.arc(x, y, r * .38, 0, Math.PI * 2); g.fill();
+  [0, 1.26, 2.51, 3.77, 5.03].forEach(a => { g.beginPath(); g.arc(x + Math.cos(a) * r * .8, y + Math.sin(a) * r * .8, r * .2, 0, Math.PI * 2); g.fill(); });
 }
 
 // ---------- jelvények ----------
@@ -101,6 +216,8 @@ export const BADGES = [
   { id: 'epito', name: 'Építőmester', desc: 'Az első építmény kész', glyph: '▦', color: '#7A4B26' },
   { id: 'vers', name: 'Megtanultad!', desc: 'Egy egész vers megy fejből', glyph: '♛', color: '#C4850B' }
 ];
+
+export const badgeInfo = b => b.id === 'epito' ? { ...b, ...world().badge } : b;
 
 // ---------- jutalmazás egy feladat után ----------
 export function starsFor(score, raw) {
@@ -135,7 +252,7 @@ export function reward({ task, score, pass, raw, mastered, wholeDone, poem }) {
 
   const buildAfter = buildProgress(G.blocks);
   const earned = [];
-  const give = id => { if (!G.badges.includes(id)) { G.badges.push(id); earned.push(BADGES.find(b => b.id === id)); } };
+  const give = id => { if (!G.badges.includes(id)) { G.badges.push(id); earned.push(badgeInfo(BADGES.find(b => b.id === id))); } };
   give('elso');
   if (mastered) give('versszak');
   if (G.perfect >= 5) give('hibatlan');
@@ -152,7 +269,7 @@ export function reward({ task, score, pass, raw, mastered, wholeDone, poem }) {
     xp, blocks, stars, earned, missionDone,
     mission: Math.min(G.mission.done, MISSION_SIZE),
     levelUp: after.lvl > before.lvl ? after : null,
-    buildDone: buildAfter.finished > buildBefore.finished ? buildBefore.build : null
+    buildDone: buildAfter.finished > buildBefore.finished ? buildBefore.stage : null
   };
 }
 

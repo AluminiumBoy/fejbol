@@ -223,11 +223,11 @@ h1,h2,h3{text-wrap:balance}
 
 /* ===== játékréteg ===== */
 :root{
-  --px:"Pixelify Sans","Nunito",system-ui,sans-serif;
+  --px:"Baloo 2","Nunito",system-ui,sans-serif;
   --grass:#4E9A2F; --grass-dark:#35701E; --gold:#E8A317; --gold-dark:#B87A0A;
   --panel:#1F2533; --panel-ink:#F3F5FA; --panel-line:#394257;
 }
-.px{font-family:var(--px);letter-spacing:.01em}
+.px{font-family:var(--px);font-weight:800;letter-spacing:0}
 .streak{font-weight:700;color:var(--due);background:var(--due-soft);border-radius:10px;padding:6px 10px;white-space:nowrap}
 
 .lvl{display:flex;gap:12px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:12px 14px}
@@ -285,3 +285,15 @@ h1,h2,h3{text-wrap:balance}
 .hud{display:flex;justify-content:space-between;margin-bottom:12px}
 .hud .big{font-size:2.2rem;font-weight:700;line-height:1;color:var(--pen)}
 .hud small{font-size:.9rem;color:var(--muted)}
+
+/* világok színei (a küldetés gombja és az XP sáv) */
+:root[data-world="car"]{--grass:#D6453D;--grass-dark:#9E2E28}
+:root[data-world="foot"]{--grass:#2E8B3E;--grass-dark:#1F6A2C}
+
+.picker{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.worlds{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.world{display:flex;flex-direction:column;gap:4px;text-align:left;background:var(--bg);border:2px solid var(--line);border-radius:14px;padding:10px}
+.world:hover{border-color:var(--pen)}
+.world canvas{width:100%;display:block;border-radius:8px;margin-bottom:4px}
+.world b{font-size:1.25rem;line-height:1.1}
+.world span{color:var(--muted);font-size:.88rem}
