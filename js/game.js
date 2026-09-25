@@ -1,5 +1,5 @@
 // Játékréteg: XP, szintek, blokkok és építkezés, jelvények, napi küldetés, hangeffektek
-import { state, save, streak, dayKey } from './store.js';
+import { state, save, streak, dayKey } from './store.js?v=14';
 
 export const MISSION_SIZE = 3;
 
@@ -225,6 +225,18 @@ export function drawCarV(g, x, y, L, c, { alpha = 1, silhouette = false, glow = 
     g.fillStyle = '#FF2B3D'; g.shadowColor = '#FF2B3D';
     g.fillRect(X(.006), yt + (yb - yt) * .18, L * .02, (yb - yt) * .22);
     g.shadowBlur = 0;
+    // villogó vagy taxitábla a tetőn
+    if (c.bar) {
+      const bw = L * .12, bx = X((c.r1 + c.r2) / 2) - bw / 2, bh = L * .022;
+      g.fillStyle = '#2A2E38'; g.fillRect(bx, yr - bh * .6, bw, bh * .6);
+      c.bar.forEach((col, k) => { g.fillStyle = col; g.shadowColor = col; g.shadowBlur = glow ? L * .04 : 0; g.fillRect(bx + k * bw / 2 + 1, yr - bh * 1.3, bw / 2 - 2, bh * .8); });
+      g.shadowBlur = 0;
+    }
+    if (c.sign) {
+      const bw = L * .1, bx = X((c.r1 + c.r2) / 2) - bw / 2, bh = L * .035;
+      g.fillStyle = '#FFE14D'; g.fillRect(bx, yr - bh, bw, bh);
+      g.fillStyle = '#1C1F28'; g.font = `800 ${bh * .7}px system-ui,sans-serif`; g.textAlign = 'center'; g.fillText('TAXI', bx + bw / 2, yr - bh * .25);
+    }
     // szárny
     if (c.spoiler) {
       const h = L * (.02 + c.spoiler * .012), sw = L * (.1 + c.spoiler * .02);

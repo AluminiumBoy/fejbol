@@ -2,7 +2,7 @@
 //   ui  = { body, dock, progress(0..1), finish(score), cleanup(fn), toast(msg) }
 //   set = [{ i: versszak sorszáma, lines: [...] }]
 //   ctx = { allWords: a vers összes szava (tippekhez) }
-import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken } from './text.js';
+import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=14';
 
 export const EXERCISES = {
   listen:   { name: 'Meghallgatás', short: 'Hallgasd meg és olvasd fel', help: 'Hallgasd meg, aztán olvasd fel hangosan te is.', icon: 'M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4' },
@@ -81,7 +81,8 @@ function listen(ui, set, ctx) {
   let count = 0, playing = false, cur = -1, audio = null, token = 0;
   let recorder = null, recUrl = null, recChunks = [], recAudio = null;
 
-  const draw = () => { ui.body.innerHTML = sheet(set, (l, si, li, g) => ln(si, li, esc(l), g === cur ? 'hl' : '')); };
+  const rg = new Map(set.map(s => [s.i, rhymeGroups(s.lines)]));
+  const draw = () => { ui.body.innerHTML = sheet(set, (l, si, li, g) => ln(si, li, rhymeLine(l, rg.get(si)[li]), g === cur ? 'hl' : '')); };
   const stop = () => {
     playing = false; cur = -1; token++;
     if (audio) { audio.pause(); audio = null; }

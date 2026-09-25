@@ -1,10 +1,11 @@
-import { parseStanzas, words, esc } from './text.js';
-import * as S from './store.js';
-import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js';
-import { searchPoems, fetchPoem, ocrImage } from './sources.js';
-import * as G from './game.js';
-import * as SH from './shop.js';
-import * as MM from './memes.js';
+import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=14';
+import * as S from './store.js?v=14';
+import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=14';
+import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=14';
+import * as G from './game.js?v=14';
+import * as SH from './shop.js?v=14';
+import * as MM from './memes.js?v=14';
+import * as CD from './cards.js?v=14';
 
 const app = document.getElementById('app');
 const I = {
@@ -112,11 +113,12 @@ VIEWS.home = () => {
         ${last && lastTask ? `<p class="small muted nexttask">${esc(taskText(last, lastTask).title)}</p>` : ''}
       </div>
     </section>
+    ${CD.col().packs ? `<button class="packbanner" id="packs"><span class="minipack" aria-hidden="true"></span><span class="grow"><b class="px">${CD.col().packs} csomag vár</b><br><span class="small">Bontsd ki, mi van benne</span></span><span class="px">Bontás</span></button>` : ''}
     <nav class="quick">
+      <button class="qbtn" id="cards"><b class="px">Kártyák</b><span>${CD.ownedCount()}/${CD.CARDS.length}</span></button>
       ${world === 'car' ? `<button class="qbtn" id="garage"><b class="px">Garázs</b><span>${G.carsUnlocked()}/${G.CARS.length} autó</span></button>` : ''}
       <button class="qbtn" id="speed"><b class="px">Speedrun</b><span>${last?.best ? `rekord: ${last.best}` : '60 mp'}</span></button>
       <button class="qbtn" id="shop"><b class="px">Bolt</b><span>${SH.shop().coins} érme</span></button>
-      <button class="qbtn" id="badges"><b class="px">Jelvények</b><span>${badgeCount}/${G.BADGES.length}</span></button>
     </nav>` : worldPickerHTML()}
     <div class="row" style="justify-content:space-between"><p class="label">Verseim</p><button class="btn ghost small" id="add">+ Új vers</button></div>
     <div class="cards">${poems.map(p => {
@@ -136,6 +138,8 @@ VIEWS.home = () => {
   app.querySelector('#rank').onclick = () => go('badges');
   app.querySelector('#badges')?.addEventListener('click', () => go('badges'));
   app.querySelector('#shop')?.addEventListener('click', () => go('shop'));
+  app.querySelector('#cards')?.addEventListener('click', () => go('cards'));
+  app.querySelector('#packs')?.addEventListener('click', () => go('pack'));
   app.querySelector('#garage')?.addEventListener('click', () => go('garage'));
   app.querySelector('#speed')?.addEventListener('click', () => last && startTask(last, blitzTask(last, -1)));
   app.querySelector('#add').onclick = () => go('add');
@@ -146,6 +150,112 @@ VIEWS.home = () => {
   });
   app.querySelectorAll('.pcard').forEach(b => b.onclick = () => go('poem', { id: b.dataset.id }));
 };
+
+// ---------- Gyűjtőkártyák ----------
+VIEWS.cards = () => {
+  const C = CD.col();
+  app.innerHTML = `
+    <div class="top">
+      <button class="icon-btn" id="back" aria-label="Vissza">${I.back}</button>
+      <h1 class="t grow px">Gyűjtemény</h1><span class="px muted">${CD.ownedCount()} / ${CD.CARDS.length}</span>
+    </div>
+    ${C.packs ? `<button class="packbanner" id="packs"><span class="minipack" aria-hidden="true"></span><span class="grow"><b class="px">${C.packs} csomag vár</b></span><span class="px">Bontás</span></button>` : `<p class="muted small" style="margin:0">Csomagot kapsz a napi küldetésért, minden megtanult versszakért, és hármat az egész versért.</p>`}
+    ${Object.keys(CD.RARITY).reverse().map(r => {
+      const list = CD.CARDS.filter(c => c.r === r);
+      return `<p class="label">${CD.RARITY[r].name} · ${list.filter(c => C.owned[c.id]).length}/${list.length}</p>
+        <div class="cgrid">${list.map(c => C.owned[c.id] ? `<button class="cslot" data-id="${c.id}">${CD.cardHTML(c, { small: true })}${C.owned[c.id] > 1 ? `<span class="dupn">×${C.owned[c.id]}</span>` : ''}</button>` : `<div class="cslot">${CD.cardHTML(c, { locked: true, small: true })}</div>`).join('')}</div>`;
+    }).join('')}`;
+  requestAnimationFrame(() => CD.paintCards(app));
+  app.querySelector('#back').onclick = back;
+  app.querySelector('#packs')?.addEventListener('click', () => go('pack'));
+  app.querySelectorAll('.cslot[data-id]').forEach(b => b.onclick = () => go('card', { id: b.dataset.id }));
+};
+
+VIEWS.card = ({ id }) => {
+  const c = CD.CARDS.find(x => x.id === id); if (!c) return back();
+  app.innerHTML = `
+    <div class="top"><button class="icon-btn" id="back" aria-label="Vissza">${I.back}</button><span class="grow"></span></div>
+    <div class="showcase">${CD.cardHTML(c)}</div>
+    <p class="muted small" style="text-align:center;margin:0">Húzd rajta az ujjad, vagy döntsd meg a telefont.</p>`;
+  requestAnimationFrame(() => { CD.paintCards(app); cleanups.push(CD.tilt(app.querySelector('.tcard'))); });
+  app.querySelector('#back').onclick = back;
+};
+
+VIEWS.pack = () => {
+  const C = CD.col();
+  if (!C.packs) return go('cards', {}, false);
+  app.innerHTML = `
+    <div class="top"><button class="icon-btn" id="back" aria-label="Vissza">${I.close}</button><span class="grow"></span><span class="px muted">${C.packs} csomag</span></div>
+    <div class="stage" id="stage">
+      <button class="pack" id="pk" aria-label="Csomag kibontása">
+        <span class="pk-logo px">Fejből</span><span class="pk-sub px">Autókártyák · 3 lap</span>
+      </button>
+      <p class="muted" id="hint">Koppints a csomagra</p>
+    </div>`;
+  app.querySelector('#back').onclick = () => go('home', {}, false);
+  const stage = app.querySelector('#stage'), pk = app.querySelector('#pk');
+  let taps = 0;
+  pk.onclick = () => {
+    taps++;
+    pk.classList.remove('shake'); void pk.offsetWidth; pk.classList.add('shake');
+    pk.style.setProperty('--glow', taps / 3);
+    G.sfx('tick');
+    if (taps < 3) { app.querySelector('#hint').textContent = taps === 1 ? 'Még…' : 'Még egyszer!'; return; }
+    const res = CD.openPack();
+    const cnt = app.querySelector('.top .px.muted'); if (cnt) cnt.textContent = CD.col().packs ? `még ${CD.col().packs} csomag` : '';
+    G.sfx('block');
+    const flash = document.createElement('div'); flash.className = 'flash'; document.body.appendChild(flash); setTimeout(() => flash.remove(), 700);
+    reveal(stage, res);
+  };
+};
+
+function reveal(stage, res) {
+  let k = 0;
+  const show = () => {
+    const { card, dup } = res.cards[k];
+    stage.innerHTML = `
+      <div class="rays r-${card.r}" aria-hidden="true"></div>
+      <div class="flipper" id="fl">
+        <div class="face back"><span class="px">Fejből</span></div>
+        <div class="face front">${CD.cardHTML(card)}</div>
+      </div>
+      <p class="muted" id="hint">Koppints a kártyára</p>
+      <div class="dots">${res.cards.map((_, i) => `<span class="${i < k ? 'on' : i === k ? 'cur' : ''}"></span>`).join('')}</div>`;
+    CD.paintCards(stage);
+    const fl = stage.querySelector('#fl');
+    let flipped = false;
+    fl.onclick = () => {
+      if (!flipped) {
+        flipped = true; fl.classList.add('flipped');
+        stage.querySelector('.rays').classList.add('on');
+        const h = stage.querySelector('#hint');
+        h.innerHTML = `<b class="px rar-${card.r}">${CD.RARITY[card.r].name}</b>${dup ? ` · megvolt már, +${CD.RARITY[card.r].xpDup} XP` : ' · ÚJ!'}`;
+        if (card.r === 'legend') { G.sfx('level'); G.confetti(3000); }
+        else if (card.r === 'epic') { G.sfx('win'); G.confetti(1400); }
+        else G.sfx(card.r === 'rare' ? 'good' : 'block');
+        if (card.r === 'epic' || card.r === 'legend') cleanups.push(CD.tilt(fl.querySelector('.tcard')));
+        return;
+      }
+      k++;
+      if (k < res.cards.length) show(); else summary();
+    };
+  };
+  const summary = () => {
+    const left = CD.col().packs;
+    stage.innerHTML = `
+      <h2 class="px" style="margin:0">Ezeket kaptad</h2>
+      <div class="cgrid three">${res.cards.map(({ card, dup }) => `<div class="cslot">${CD.cardHTML(card, { small: true })}${dup ? '' : '<span class="newtag px">Új</span>'}</div>`).join('')}</div>
+      ${res.xp ? `<p class="muted small" style="margin:0">Duplikátumokért: +${res.xp} XP</p>` : ''}
+      <div class="stack" style="width:100%">
+        ${left ? `<button class="btn primary big px" id="more">Következő csomag (${left})</button>` : ''}
+        <button class="btn big px ${left ? '' : 'primary'}" id="coll">Gyűjtemény</button>
+      </div>`;
+    CD.paintCards(stage);
+    stage.querySelector('#more')?.addEventListener('click', () => VIEWS.pack());
+    stage.querySelector('#coll').onclick = () => go('cards', {}, false);
+  };
+  show();
+}
 
 // ---------- Jutalombolt ----------
 const fmtDate = t => new Date(t).toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' });
@@ -389,7 +499,7 @@ VIEWS.poem = ({ id, scope = -1 }) => {
       <button class="tile ${e.special ? 'special' : ''}" data-t="${k}"><svg class="ic" viewBox="0 0 24 24"><path d="${e.icon}"/></svg><b>${e.name}</b><span>${e.short}</span></button>`).join('')}
     </div>
     <details class="stack"><summary class="label" style="cursor:pointer;padding:6px 0">A teljes vers</summary>
-      <div class="sheet"><div class="poem">${stz.map((lines, i) => `<p class="stanza">${lines.map((l, li) => `<span class="ln">${li === 0 && n > 1 ? `<span class="snum">${i + 1}.</span>` : ''}${esc(l)}</span>`).join('')}</p>`).join('')}</div></div>
+      <div class="sheet"><div class="poem">${stz.map((lines, i) => { const rg = rhymeGroups(lines); return `<p class="stanza">${lines.map((l, li) => `<span class="ln">${li === 0 && n > 1 ? `<span class="snum">${i + 1}.</span>` : ''}${rhymeLine(l, rg[li])}</span>`).join('')}</p>`; }).join('')}</div></div>
     </details>`;
   app.querySelector('#back').onclick = () => go('home');
   app.querySelector('#edit').onclick = () => go('edit', { id });
@@ -431,6 +541,8 @@ VIEWS.exercise = ({ id, task }) => {
       if (finished) return; finished = true;
       const r = S.applyResult(poem, task, score);
       const rw = G.reward({ task, score, raw, poem, ...r });
+      rw.packs = (rw.missionDone ? 1 : 0) + (r.mastered ? 1 : 0) + (r.wholeDone ? 3 : 0);
+      CD.givePacks(rw.packs);
       go('result', { id, task, score, raw, pass: r.pass, rw, wholeDone: r.wholeDone, mastered: r.mastered }, false);
     }
   };
@@ -468,6 +580,7 @@ VIEWS.result = ({ id, task, score, raw, pass, rw, wholeDone, mastered }) => {
     ${rw?.missionDone ? `<div class="levelup chestwin"><span class="chest open" aria-hidden="true"></span><div><b class="px">Napi küldetés kész</b><br><span>Láda: +30 XP</span></div></div>`
       : rw ? `<div class="note small">Napi küldetés: ${m.done}/${G.MISSION_SIZE}${m.claimed ? ' (kész)' : ''}</div>` : ''}
     ${(rw?.newCars || []).map(c => `<div class="newcar"><p class="label">Új autó feloldva</p><canvas data-car="${c.id}"></canvas><b class="px">${esc(c.name)}</b><button class="btn primary px" data-drive="${c.id}">Beülök</button></div>`).join('')}
+    ${rw?.packs ? `<button class="packbanner" id="openpack"><span class="minipack" aria-hidden="true"></span><span class="grow"><b class="px">+${rw.packs} kártyacsomag</b><br><span class="small">Koppints és bontsd ki</span></span><span class="px">Bontás</span></button>` : ''}
     ${rw?.buildDone ? `<div class="levelup"><span class="lvbadge px">✓</span><div><b class="px">${esc(G.world().done(rw.buildDone))}</b><br><span>${G.world().next}</span></div></div>` : ''}
     ${(rw?.earned || []).map(b => `<div class="levelup"><span class="bico px" style="--bc:${b.color}">${b.glyph}</span><div><b class="px">Új jelvény: ${esc(b.name)}</b><br><span>${esc(b.desc)}</span></div></div>`).join('')}
     ${rw?.blocks && S.state.settings.world ? `<section class="buildcard"><p class="label">${esc(G.world().label(bp.stage))} · ${bp.placed} / ${bp.size} ${G.world().unit}</p><canvas id="build"></canvas></section>` : ''}
@@ -486,6 +599,7 @@ VIEWS.result = ({ id, task, score, raw, pass, rw, wholeDone, mastered }) => {
   else if (stars >= 2) G.sfx('win');
   const memeKind = stars >= 3 || wholeDone || (blitz && raw >= (poem.best || 0) && raw > 0) ? 'good' : stars <= 1 ? 'bad' : null;
   if (memeKind && MM.memesOn()) MM.pick(memeKind).then(src => { const im = app.querySelector('#meme'); if (im) { im.src = src; im.hidden = false; } });
+  app.querySelector('#openpack')?.addEventListener('click', () => go('pack'));
   app.querySelector('#next')?.addEventListener('click', () => go('exercise', { id, task: next }, false));
   app.querySelector('#again').onclick = () => go('exercise', { id, task }, false);
   app.querySelector('#done').onclick = () => go('poem', { id }, false);
@@ -671,6 +785,9 @@ VIEWS.settings = () => {
     <div class="chips" id="size">${['Normál', 'Nagy', 'Óriás'].map((l, i) => `<button class="chip" data-v="${i}" aria-pressed="${(set.size || 0) === i}">${l}</button>`).join('')}</div>
     <p class="label">Világ</p>
     <div class="chips" id="world">${Object.entries(G.WORLDS).map(([k, w]) => `<button class="chip" data-v="${k}" aria-pressed="${(set.world || 'build') === k}">${w.name}</button>`).join('')}</div>
+    <p class="label">Vers háttere</p>
+    <div class="chips" id="paper"><button class="chip" data-v="0" aria-pressed="${!set.paper}">Sötét</button><button class="chip" data-v="1" aria-pressed="${!!set.paper}">Papír (legjobban olvasható)</button></div>
+    <p class="muted small" style="margin:0">A rímelő sorvégek színesek és aláhúzottak, az éppen olvasott sor zöld: ez segít megjegyezni.</p>
     <p class="label">Mém reakciók</p>
     <div class="chips" id="memeOn"><button class="chip" data-v="1" aria-pressed="${MM.memesOn()}">Be</button><button class="chip" data-v="0" aria-pressed="${!MM.memesOn()}">Ki</button></div>
     ${MM.memesOn() ? `<p class="muted small" style="margin:0">Saját mémeket is feltölthetsz. Csak ezen a telefonon tárolódnak. Ha nincs feltöltve semmi, a beépített cicák jönnek.</p>
@@ -688,6 +805,7 @@ VIEWS.settings = () => {
   app.querySelector('#back').onclick = back;
   app.querySelectorAll('#size .chip').forEach(b => b.onclick = () => { S.setSize(+b.dataset.v); VIEWS.settings(); });
   app.querySelectorAll('#world .chip').forEach(b => b.onclick = () => { setWorld(b.dataset.v); VIEWS.settings(); });
+  app.querySelectorAll('#paper .chip').forEach(b => b.onclick = () => { set.paper = b.dataset.v === '1'; S.save(); document.documentElement.dataset.paper = set.paper ? '1' : '0'; VIEWS.settings(); });
   app.querySelectorAll('#memeOn .chip').forEach(b => b.onclick = () => { MM.setMemes(b.dataset.v === '1'); VIEWS.settings(); });
   const fillMemes = async () => {
     const all = await MM.listMemes();
@@ -724,6 +842,7 @@ VIEWS.settings = () => {
 // ---------- indulás ----------
 document.documentElement.dataset.size = S.state.settings.size || 0;
 if (S.state.settings.world) document.documentElement.dataset.world = S.state.settings.world;
+document.documentElement.dataset.paper = S.state.settings.paper ? '1' : '0';
 S.save();
 loadAudioIndex();
 go('home', {}, false);

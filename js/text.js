@@ -77,3 +77,39 @@ export function matchSpoken(expected, heard) {
   }
   return { ratio: n ? L[0][0] / n : 1, hit };
 }
+
+// Rímpárok egy versszakon belül. A magyar rím a magánhangzókon múlik (kend – bent, ád – dolgát),
+// ezért a kulcs: az utolsó magánhangzó, és hogy mássalhangzó zárja-e a szót.
+// Visszaad: soronként csoportszám (0, 1, …) vagy -1, ha a sor vége nem rímel másikkal.
+const VOW = /[aáeéiíoóöőuúüű]/;
+export function rhymeGroups(lines) {
+  const key = l => {
+    const w = (words(l).slice(-1)[0] || '').toLowerCase();
+    for (let i = w.length - 1; i >= 0; i--) if (VOW.test(w[i])) return w[i] + (w.length - 1 > i ? 'm' : '');
+    return '';
+  };
+  const keys = lines.map(key), out = new Array(lines.length).fill(-1), seen = new Map();
+  keys.forEach((k, i) => {
+    if (!k || keys.filter(x => x === k).length < 2) return;
+    if (!seen.has(k)) seen.set(k, seen.size);
+    out[i] = seen.get(k);
+  });
+  // ha kettőnél több sor esett egy csoportba, csak a két leghasonlóbb végű marad
+  const ends = lines.map(l => norm(words(l).slice(-1)[0] || ''));
+  const suf = (a, b) => { let n = 0; while (n < a.length && n < b.length && a[a.length - 1 - n] === b[b.length - 1 - n]) n++; return n; };
+  for (const gi of new Set(out.filter(x => x >= 0))) {
+    const m = out.map((x, i) => x === gi ? i : -1).filter(i => i >= 0);
+    if (m.length <= 2) continue;
+    let best = [m[0], m[1]], bs = -1;
+    for (let a = 0; a < m.length; a++) for (let b = a + 1; b < m.length; b++) { const v = suf(ends[m[a]], ends[m[b]]); if (v > bs) { bs = v; best = [m[a], m[b]]; } }
+    m.forEach(i => { if (!best.includes(i)) out[i] = -1; });
+  }
+  return out;
+}
+// a sor HTML-je, a rímelő utolsó szó kiemelve
+export function rhymeLine(line, grp) {
+  if (grp < 0) return esc(line);
+  const tk = tokens(line); let last = -1;
+  tk.forEach((t, i) => { if (t.w) last = i; });
+  return tk.map((t, i) => t.t !== undefined ? esc(t.t) : i === last ? `<span class="rh rh${grp % 2}">${esc(t.w)}</span>` : esc(t.w)).join('');
+}
