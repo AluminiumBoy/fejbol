@@ -1,6 +1,7 @@
 // Játékréteg: XP, szintek, blokkok és építkezés, jelvények, napi küldetés, hangeffektek
-import { state, save, streak, dayKey } from './store.js?v=16';
-import { cardById } from './cards.js?v=16';
+import { state, save, streak, dayKey } from './store.js?v=19';
+import { cardById } from './cards.js?v=19';
+import { petName } from './pet.js?v=19';
 
 export const MISSION_SIZE = 3;
 
@@ -19,6 +20,16 @@ export function levelInfo(xp = state.game.xp) {
 const RANKS = ['Újonc', 'Bronz I', 'Bronz II', 'Ezüst I', 'Ezüst II', 'Arany I', 'Arany II', 'Platina', 'Gyémánt', 'Mester', 'Nagymester', 'Legenda'];
 
 export const WORLDS = {
+  pet: {
+    name: 'Kisállat', desc: 'Neveld fel a saját rókádat: a tanulás eteti és növeszti', unit: 'csillag',
+    levels: RANKS,
+    stage: i => ({ name: ['Kamasz', 'Felnőtt', 'Legenda', 'Legenda'][Math.min(i, 3)], size: [25, 45, 80, Infinity][Math.min(i, 3)], n: i }),
+    label: st => `Következő: ${st.name}`,
+    hint: 'Minden csillag közelebb visz a növéshez.',
+    done: st => `${petName()} megnőtt: ${st.name}!`, next: 'Nézd meg a kezdőlapon!',
+    badge: { name: 'Első növés', desc: 'A kisállatod először nőtt' },
+    draw: drawPetPreview
+  },
   car: {
     name: 'Autós', desc: 'Versenyzés, minden csillag 1 km', unit: 'km',
     levels: RANKS,
@@ -58,6 +69,16 @@ function setup(canvas, W, H) {
   canvas.style.height = (H * px) + 'px';
   const g = canvas.getContext('2d'); g.scale(dpr, dpr); g.imageSmoothingEnabled = false;
   return { g, px };
+}
+
+// Kisállat előnézet a világválasztóhoz (egy előre lerenderelt kép)
+const petPrev = new Image(); petPrev.src = 'img/pet-preview.webp';
+function drawPetPreview(canvas) {
+  const w = canvas.clientWidth || 300, h = Math.round(w * .5), dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr; canvas.height = h * dpr; canvas.style.height = h + 'px';
+  const g = canvas.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const paint = () => { const k = Math.max(w / petPrev.naturalWidth, h / petPrev.naturalHeight); const iw = petPrev.naturalWidth * k, ih = petPrev.naturalHeight * k; g.drawImage(petPrev, (w - iw) / 2, (h - ih) / 2 - h * .05, iw, ih); };
+  if (petPrev.complete && petPrev.naturalWidth) paint(); else petPrev.addEventListener('load', paint, { once: true });
 }
 
 // Autós: garázs. Minden megnyert futam felold egy új, valódi autót (a gyűjtőkártyák fotóival).

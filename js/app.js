@@ -1,11 +1,12 @@
-import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=16';
-import * as S from './store.js?v=16';
-import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=16';
-import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=16';
-import * as G from './game.js?v=16';
-import * as SH from './shop.js?v=16';
-import * as MM from './memes.js?v=16';
-import * as CD from './cards.js?v=16';
+import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=19';
+import * as S from './store.js?v=19';
+import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=19';
+import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=19';
+import * as G from './game.js?v=19';
+import * as SH from './shop.js?v=19';
+import * as MM from './memes.js?v=19';
+import * as CD from './cards.js?v=19';
+import * as P from './pet.js?v=19';
 
 const app = document.getElementById('app');
 const I = {
@@ -102,8 +103,8 @@ VIEWS.home = () => {
       <button class="icon-btn" id="settings" aria-label="Beállítások">${I.gear}</button>
     </div>
     ${world ? `<section class="hero ${m.claimed ? 'claimed' : ''}">
-      <div class="hero-vis"><canvas id="build" aria-label="${esc(W.label(bp.stage))}: ${bp.placed} / ${bp.size} ${W.unit}"></canvas>
-        <span class="hero-tag px">${esc(bp.stage.name)} · ${bp.placed}/${bp.size} ${W.unit}</span></div>
+      ${world === 'pet' ? petHeroHTML(bp) : `<div class="hero-vis"><canvas id="build" aria-label="${esc(W.label(bp.stage))}: ${bp.placed} / ${bp.size} ${W.unit}"></canvas>
+        <span class="hero-tag px">${esc(bp.stage.name)} · ${bp.placed}/${bp.size} ${W.unit}</span></div>`}
       <div class="hero-body">
         <div class="mrow">
           <div class="mdots">${Array.from({ length: G.MISSION_SIZE }, (_, i) => `<span class="${i < m.done ? 'on' : ''}"></span>`).join('')}</div>
@@ -116,6 +117,7 @@ VIEWS.home = () => {
     </section>
     ${CD.col().packs ? `<button class="packbanner" id="packs"><span class="minipack" aria-hidden="true"></span><span class="grow"><b class="px">${CD.col().packs} csomag vár</b><br><span class="small">Bontsd ki, mi van benne</span></span><span class="px">Bontás</span></button>` : ''}
     <nav class="quick">
+      ${world === 'pet' ? `<button class="qbtn" id="petbtn"><b class="px">${esc(P.petName())}</b><span>beszélgetés</span></button>` : ''}
       <button class="qbtn" id="cards"><b class="px">Kártyák</b><span>${CD.ownedCount()}/${CD.CARDS.length}</span></button>
       ${world === 'car' ? `<button class="qbtn" id="garage"><b class="px">Garázs</b><span>${G.carsUnlocked()}/${G.CARS.length} autó</span></button>` : ''}
       <button class="qbtn" id="speed"><b class="px">Speedrun</b><span>${last?.best ? `rekord: ${last.best}` : '60 mp'}</span></button>
@@ -134,7 +136,7 @@ VIEWS.home = () => {
     const c = app.querySelector('#build'); if (c) G.drawProgress(c, bp);
     app.querySelectorAll('canvas[data-world]').forEach(cv => { const w = G.WORLDS[cv.dataset.world]; G.drawProgress(cv, G.buildProgress(Math.max(S.state.game.blocks, 14), w), 0, w); });
   });
-  app.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { setWorld(b.dataset.pick); G.sfx('win'); VIEWS.home(); });
+  app.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { setWorld(b.dataset.pick); G.sfx('win'); if (b.dataset.pick === 'pet' && !P.pet().g) go('petpick'); else VIEWS.home(); });
   app.querySelector('#settings').onclick = () => go('settings');
   app.querySelector('#rank').onclick = () => go('badges');
   app.querySelector('#badges')?.addEventListener('click', () => go('badges'));
@@ -142,6 +144,8 @@ VIEWS.home = () => {
   app.querySelector('#cards')?.addEventListener('click', () => go('cards'));
   app.querySelector('#packs')?.addEventListener('click', () => go('pack'));
   app.querySelector('#garage')?.addEventListener('click', () => go('garage'));
+  app.querySelector('#petbtn')?.addEventListener('click', () => go('pet'));
+  if (world === 'pet') mountHeroPet();
   app.querySelector('#speed')?.addEventListener('click', () => last && startTask(last, blitzTask(last, -1)));
   app.querySelector('#add').onclick = () => go('add');
   app.querySelector('#cont')?.addEventListener('click', () => {
@@ -426,6 +430,164 @@ VIEWS.badges = () => {
   app.querySelector('#back').onclick = back;
 };
 
+// ---------- Kisállat ----------
+const petStage = () => Math.min(3, G.buildProgress(S.state.game.blocks, G.WORLDS.pet).finished);
+function petHeroHTML(bp) {
+  const p = P.pet();
+  return `<div class="hero-vis petvis">
+    <canvas id="petcv" class="petcv" aria-label="${esc(P.petName())}, a kisállatod"></canvas>
+    <span class="hero-tag px">${esc(P.petName())} · ${['Kölyök', 'Kamasz', 'Felnőtt', 'Legenda'][petStage()]}</span>
+    <span class="petmeter" title="Jóllakottság"><i style="width:${Math.round(p.food * 100)}%;background:${p.food < .3 ? 'var(--bad)' : '#FFB547'}"></i></span>
+    <div class="pbubble off" id="pbubble"></div>
+    ${p.snacks ? `<button class="feedbtn px" id="feed"><img src="img/drumstick.png" alt="">Etetés · ${p.snacks}</button>` : ''}
+    ${petStage() < 3 ? `<span class="growtag small">${bp.placed}/${bp.size} csillag a növésig</span>` : ''}
+  </div>`;
+}
+let petApi = null, petVoices = new Map(), bubbleTimer;
+async function loadPet(canvas, frame) {
+  const mod = await import('./pet3d.js?v=19');
+  const p = P.pet();
+  const seen = Math.min(p.seen ?? petStage(), petStage());
+  const api = await mod.mountPet(canvas, { frame, gender: p.g || 'm', stage: seen, hungry: P.hungry(), onTap: () => petTap() });
+  petVoices = new Map();
+  cleanups.push(() => { api.dispose(); if (petApi === api) petApi = null; });
+  petApi = api;
+  return api;
+}
+function petSay(txt, key, ms = 2600) {
+  const b = document.getElementById('pbubble'); if (!b) return;
+  b.textContent = txt; b.classList.remove('off');
+  clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => b.classList.add('off'), ms);
+  if (!key || !petApi) return;
+  const g = P.pet().g || 'm', k = g + '/' + key;
+  if (!petVoices.has(k)) petVoices.set(k, fetch(`voice/${g}/${key}.mp3`).then(r => r.arrayBuffer()).then(a => petApi.audio().decodeAudioData(a)));
+  petVoices.get(k).then(buf => petApi?.speak(buf)).catch(() => {});
+}
+const POKES = [['Hihi, ez csiklandoz!', 'poke1'], ['Tanuljunk még egy versszakot?', 'poke2'], ['Te vagy a legjobb!', 'poke4'], ['Mondd el nekem a verset!', 'poke5'], ['Hajrá, menni fog!', 'go']];
+function petTap() {
+  if (!petApi) return;
+  if (petApi.isAsleep()) return petSay('Zzz… hagyj aludni…', 'sleepy');
+  petApi.poke(); G.sfx('good');
+  if (P.hungry()) return petSay('Éhes vagyok… tanuljunk egy kicsit?', 'hungry');
+  const [t, k] = POKES[Math.floor(Math.random() * POKES.length)]; petSay(t, k);
+}
+function petFeed(after) {
+  if (!petApi) return;
+  if (!P.pet().snacks) return petSay('Nincs több falat. Egy feladat, és kapok?', 'nosnack', 3000);
+  if (P.pet().food >= 1) return petSay('Tele vagyok, köszi!', 'full');
+  if (!P.feedOne()) return;
+  petSay('Nyami!', 'yum');
+  petApi.eat(() => { petApi?.setMood(P.hungry()); petSay('Mmm, finom! Köszi!', 'thanks'); after?.(); });
+}
+let greeted = false;
+async function mountHeroPet() {
+  const cv = app.querySelector('#petcv'); if (!cv) return;
+  try { await loadPet(cv, 'card'); } catch (e) { cv.replaceWith(Object.assign(document.createElement('p'), { className: 'muted small', textContent: 'A kisállat betöltéséhez internet kell.' })); return; }
+  const p = P.pet();
+  app.querySelector('#feed')?.addEventListener('click', () => petFeed(() => VIEWS.home()));
+  // ha tanulás közben megnőtt, most látványosan megmutatja
+  if ((p.seen ?? 0) < petStage()) {
+    p.seen = petStage(); S.save();
+    setTimeout(() => { petApi?.setStage(p.seen, true); G.sfx('level'); petSay('Ügyes voltál! Nézd, megnőttem!', 'proud', 3200); }, 600);
+    greeted = true; return;
+  }
+  p.seen = petStage(); S.save();
+  setTimeout(() => {
+    if (p.snacks) petSay(`${p.snacks} falatot kaptál! Adsz nekem?`, 'snack', 3200);
+    else if (P.hungry()) petSay('Éhes vagyok… tanuljunk egy kicsit?', 'hungry', 3200);
+    else if (!greeted) petSay('De jó, hogy itt vagy!', 'welcome');
+    greeted = true;
+  }, 700);
+}
+
+VIEWS.petpick = () => {
+  app.innerHTML = `
+    <div class="top"><button class="icon-btn" id="back" aria-label="Vissza">${I.back}</button><h1 class="t grow px">Kit nevelsz?</h1></div>
+    <p class="muted" style="margin:0">A tanulás eteti és növeszti. Ha pár napig nem tanulsz, éhes és szomorú lesz.</p>
+    <div class="gpick">
+      <button class="gcard" data-g="m"><img src="img/pet-m.webp" alt=""><b class="px">Rókus</b><span>fiú róka</span></button>
+      <button class="gcard" data-g="f"><img src="img/pet-f.webp" alt=""><b class="px">Roxi</b><span>lány róka</span></button>
+    </div>`;
+  app.querySelector('#back').onclick = () => go('home', {}, false);
+  app.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { P.setGender(b.dataset.g); P.giveSnacks(P.pet().snacks ? 0 : 1); G.sfx('win'); go('home', {}, false); });
+};
+
+VIEWS.pet = () => {
+  const p = P.pet();
+  app.innerHTML = `
+    <div class="petfull">
+      <canvas id="petcv" class="petcv full"></canvas>
+      <div class="pethud">
+        <button class="icon-btn" id="back" aria-label="Vissza">${I.back}</button>
+        <b class="px grow" style="font-size:1.6rem">${esc(P.petName())}</b>
+        <span class="petmeter big" title="Jóllakottság"><i style="width:${Math.round(p.food * 100)}%;background:${p.food < .3 ? 'var(--bad)' : '#FFB547'}"></i></span>
+      </div>
+      <div class="pbubble off" id="pbubble"></div>
+      <div class="petdock">
+        <button class="btn go px" id="talk">Beszélj hozzá</button>
+        <div class="row">
+          <button class="btn grow" id="feed"><img src="img/drumstick.png" alt="" width="24">Etetés · <span id="sn">${p.snacks}</span></button>
+          <button class="btn grow" id="sleep"><img src="img/zzz.png" alt="" width="24">Alvás</button>
+          <button class="btn grow" id="poem"><img src="img/sparkles.png" alt="" width="24">Vers</button>
+        </div>
+        <button class="btn ghost small" id="swap">Fiú / lány csere</button>
+      </div>
+    </div>`;
+  let listening = false, stream, micAn, recorder, chunks = [], speaking = false, quietSince = 0, replaying = false, vadTimer;
+  const talkBtn = app.querySelector('#talk');
+  const stopMic = () => { listening = false; clearInterval(vadTimer); stream?.getTracks().forEach(t => t.stop()); stream = null; talkBtn.classList.remove('on'); talkBtn.textContent = 'Beszélj hozzá'; };
+  cleanups.push(stopMic);
+  const tb = new Float32Array(1024);
+  const lvl = an => { an.getFloatTimeDomainData(tb); let s = 0; for (const v of tb) s += v * v; return Math.sqrt(s / tb.length); };
+  talkBtn.onclick = async () => {
+    if (!petApi) return;
+    if (listening) return stopMic();
+    if (petApi.isAsleep()) return petSay('Zzz… hagyj aludni…', 'sleepy');
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+    catch (e) { return petSay('Engedélyezd a mikrofont, hogy halljalak!', 'mic', 3000); }
+    const a = petApi.audio(); micAn = a.createAnalyser(); micAn.fftSize = 1024; a.createMediaStreamSource(stream).connect(micAn);
+    listening = true; talkBtn.classList.add('on'); talkBtn.textContent = 'Hallgatlak…';
+    petSay('Mondj valamit, visszamondom!', 'listen', 2500);
+    // ha beszélsz, felveszi; ha elhallgatsz, vékony, vicces hangon visszamondja
+    vadTimer = setInterval(() => {
+      if (!listening || replaying) return;
+      const l = lvl(micAn), now = performance.now();
+      if (!speaking && l > .035) {
+        speaking = true; quietSince = 0; chunks = [];
+        recorder = new MediaRecorder(stream); recorder.ondataavailable = e => chunks.push(e.data);
+        recorder.onstop = async () => {
+          if (!chunks.length) return; replaying = true;
+          try { const b = await petApi.audio().decodeAudioData(await new Blob(chunks, { type: recorder.mimeType }).arrayBuffer()); await petApi.speak(b, 1.6); } catch (e) {}
+          replaying = false;
+        };
+        recorder.start();
+      } else if (speaking) {
+        if (l < .02) { quietSince ||= now; if (now - quietSince > 700) { speaking = false; recorder.stop(); } } else quietSince = 0;
+      }
+    }, 50);
+  };
+  app.querySelector('#back').onclick = back;
+  app.querySelector('#feed').onclick = () => petFeed(() => { app.querySelector('#sn').textContent = P.pet().snacks; });
+  app.querySelector('#sleep').onclick = e => {
+    if (!petApi) return;
+    const on = !petApi.isAsleep(); petApi.setSleep(on); e.currentTarget.classList.toggle('on', on);
+    if (on) { stopMic(); petSay('Jó éjt!', 'night'); } else { petSay('Jó reggelt! Tanulunk?', 'morning'); petApi.jump(); petApi.happy(); }
+  };
+  app.querySelector('#poem').onclick = async () => {
+    if (!petApi || petApi.isAsleep()) return petSay('Zzz… hagyj aludni…', 'sleepy');
+    const poem = S.getPoem(S.state.lastPoem) || S.state.poems[0];
+    const first = parseStanzas(poem.text)[0], voice = (P.pet().g === 'f') ? 'noemi' : 'tamas';
+    const clip = stanzaAudio(first, voice);
+    if (!clip) return petSay('Ezt a verset még nem tudom felolvasni.');
+    petSay(first[0] + ' …', null, 4200);
+    try { const buf = await petApi.audio().decodeAudioData(await (await fetch(clip.url)).arrayBuffer()); await petApi.speak(buf, 1.05); } catch (e) {}
+  };
+  app.querySelector('#swap').onclick = () => { P.setGender(P.pet().g === 'f' ? 'm' : 'f'); petVoices = new Map(); petApi?.setGender(P.pet().g); VIEWS.pet(); };
+  loadPet(app.querySelector('#petcv'), 'full').then(() => {
+    setTimeout(() => P.hungry() ? petSay('Éhes vagyok… tanuljunk egy kicsit?', 'hungry') : petSay('Koppints rám, vagy beszélj hozzám!', null, 3000), 500);
+  }).catch(() => petSay('A kisállat betöltéséhez internet kell.'));
+};
+
 function worldPickerHTML() {
   return `<section class="picker">
     <p class="label">Válassz világot!</p>
@@ -544,6 +706,8 @@ VIEWS.exercise = ({ id, task }) => {
       const r = S.applyResult(poem, task, score);
       const rw = G.reward({ task, score, raw, poem, ...r });
       rw.packs = (rw.missionDone ? 1 : 0) + (r.mastered ? 1 : 0) + (r.wholeDone ? 3 : 0);
+      rw.snacks = (r.pass && task.type !== 'listen' ? 1 : 0) + (rw.missionDone ? 1 : 0) + (r.mastered ? 1 : 0);
+      if (S.state.settings.world === 'pet') P.giveSnacks(rw.snacks); else rw.snacks = 0;
       CD.givePacks(rw.packs);
       go('result', { id, task, score, raw, pass: r.pass, rw, wholeDone: r.wholeDone, mastered: r.mastered }, false);
     }
@@ -576,6 +740,7 @@ VIEWS.result = ({ id, task, score, raw, pass, rw, wholeDone, mastered }) => {
         <span class="px">+${rw.xp} XP</span>
         ${rw.blocks ? `<span class="px">+${rw.blocks} ${G.world().unit}</span>` : ''}
         ${rw.coins ? `<span class="px coin">+${rw.coins} érme</span>` : ''}
+        ${rw.snacks ? `<span class="px snack">+${rw.snacks} falat</span>` : ''}
       </div>` : ''}
     </div>
     ${rw?.levelUp ? `<div class="levelup"><span class="lvbadge px">${rw.levelUp.lvl}</span><div><b class="px">Új rang: ${rw.levelUp.name}</b><br><span>${rw.levelUp.lvl}. szint</span></div></div>` : ''}

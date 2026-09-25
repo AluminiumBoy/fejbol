@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+<style>html,body{margin:0;background:#000}canvas{width:600px;height:600px;display:block}</style></head><body>
+<canvas id="c"></canvas>
+<script type="module">
+// Segédoldal a kisállat-képek elkészítéséhez: tools/petshot.html?g=m&s=2
+const q = new URLSearchParams(location.search);
+const { mountPet } = await import('../js/pet3d.js');
+document.baseURI;
+const api = await mountPet(document.getElementById('c'), { frame: 'card', gender: q.get('g') || 'm', stage: +(q.get('s') || 0) });
+if (q.get('happy')) setTimeout(() => api.happy(5), 1200);
+setTimeout(() => window.done = true, 2600);
+</script></body></html>
