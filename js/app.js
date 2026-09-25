@@ -1,11 +1,11 @@
-import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=15';
-import * as S from './store.js?v=15';
-import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=15';
-import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=15';
-import * as G from './game.js?v=15';
-import * as SH from './shop.js?v=15';
-import * as MM from './memes.js?v=15';
-import * as CD from './cards.js?v=15';
+import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=16';
+import * as S from './store.js?v=16';
+import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=16';
+import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=16';
+import * as G from './game.js?v=16';
+import * as SH from './shop.js?v=16';
+import * as MM from './memes.js?v=16';
+import * as CD from './cards.js?v=16';
 
 const app = document.getElementById('app');
 const I = {
@@ -13,6 +13,7 @@ const I = {
   close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   edit: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>',
   gear: '<svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  gift: '<svg viewBox="0 0 24 24"><path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7c-1.5-3-5-3.5-5-1.2C7 7 9.5 7 12 7zm0 0c1.5-3 5-3.5 5-1.2C17 7 14.5 7 12 7z"/></svg>',
   star: '<svg viewBox="0 0 24 24"><path stroke-width="1.5" d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z"/></svg>',
   camera: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'
 };
@@ -578,7 +579,7 @@ VIEWS.result = ({ id, task, score, raw, pass, rw, wholeDone, mastered }) => {
       </div>` : ''}
     </div>
     ${rw?.levelUp ? `<div class="levelup"><span class="lvbadge px">${rw.levelUp.lvl}</span><div><b class="px">Új rang: ${rw.levelUp.name}</b><br><span>${rw.levelUp.lvl}. szint</span></div></div>` : ''}
-    ${rw?.missionDone ? `<div class="levelup chestwin"><span class="chest open" aria-hidden="true"></span><div><b class="px">Napi küldetés kész</b><br><span>Láda: +30 XP</span></div></div>`
+    ${rw?.missionDone ? `<div class="levelup chestwin"><span class="ico-round" aria-hidden="true">${I.gift}</span><div><b class="px">Napi küldetés kész</b><br><span>Láda: +30 XP</span></div></div>`
       : rw ? `<div class="note small">Napi küldetés: ${m.done}/${G.MISSION_SIZE}${m.claimed ? ' (kész)' : ''}</div>` : ''}
     ${(rw?.newCars || []).map(c => `<div class="newcar"><p class="label">Új autó feloldva</p><div class="carstage"><img src="${c.img}" alt="${esc(c.name)}"></div><b class="px">${esc(c.name)}</b><button class="btn primary px" data-drive="${c.id}">Beülök</button></div>`).join('')}
     ${rw?.packs ? `<button class="packbanner" id="openpack"><span class="minipack" aria-hidden="true"></span><span class="grow"><b class="px">+${rw.packs} kártyacsomag</b><br><span class="small">Koppints és bontsd ki</span></span><span class="px">Bontás</span></button>` : ''}
@@ -851,6 +852,7 @@ VIEWS.settings = () => {
 
 // ---------- indulás ----------
 document.documentElement.dataset.size = S.state.settings.size || 0;
+if (S.state.settings.world === 'build') { S.state.settings.world = 'car'; S.save(); } // az Építő világ megszűnt
 if (S.state.settings.world) document.documentElement.dataset.world = S.state.settings.world;
 document.documentElement.dataset.paper = S.state.settings.paper ? '1' : '0';
 S.save();

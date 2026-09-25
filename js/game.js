@@ -1,6 +1,6 @@
 // Játékréteg: XP, szintek, blokkok és építkezés, jelvények, napi küldetés, hangeffektek
-import { state, save, streak, dayKey } from './store.js?v=15';
-import { cardById } from './cards.js?v=15';
+import { state, save, streak, dayKey } from './store.js?v=16';
+import { cardById } from './cards.js?v=16';
 
 export const MISSION_SIZE = 3;
 
@@ -16,46 +16,9 @@ export function levelInfo(xp = state.game.xp) {
 // ---------- világok ----------
 // A csillagokból gyűlő pontok (state.game.blocks) mindhárom világban ugyanazok, csak a megjelenés más.
 // . üres, S kő, W ablak, G kapu, F zászló, P rúd, R tető
-const BUILDS = [
-  { name: 'Vár', rows: [
-    '...F........F...',
-    '...P........P...',
-    '.S.S.S....S.S.S.',
-    '.SSSSS....SSSSS.',
-    '.SSWSS.SS.SSWSS.',
-    '.SSSSSSSSSSSSSS.',
-    '.SWSSSSSSSSSSWS.',
-    '.SSSSSSSSSSSSSS.',
-    '.SSSSSGGGGSSSSS.',
-    '.SSSSSGGGGSSSSS.',
-    '.SSSSSGGGGSSSSS.'] },
-  { name: 'Torony', rows: [
-    '.......F........',
-    '.......P........',
-    '......RRR.......',
-    '.....RRRRR......',
-    '....RRRRRRR.....',
-    '.....SSSSS......',
-    '.....SWSWS......',
-    '.....SSSSS......',
-    '.....SWSWS......',
-    '.....SSSSS......',
-    '.....SSGSS......'] }
-];
 const RANKS = ['Újonc', 'Bronz I', 'Bronz II', 'Ezüst I', 'Ezüst II', 'Arany I', 'Arany II', 'Platina', 'Gyémánt', 'Mester', 'Nagymester', 'Legenda'];
-const cellsOf = b => b.rows.join('').replace(/\./g, '').length;
 
 export const WORLDS = {
-  build: {
-    name: 'Építő', desc: 'Blokkokból vár és torony épül', unit: 'blokk',
-    levels: RANKS,
-    stage: i => { const b = BUILDS[i % BUILDS.length]; return { ...b, size: cellsOf(b), name: i >= BUILDS.length ? `${b.name} (${Math.floor(i / BUILDS.length) + 1}.)` : b.name }; },
-    label: st => `Építkezés: ${st.name}`,
-    hint: 'Minden csillag egy blokk. Tanulj, és felépül!',
-    done: st => `Felépült: ${st.name}!`, next: 'Kezdődik a következő építkezés.',
-    badge: { name: 'Építőmester', desc: 'Az első építmény kész' },
-    draw: drawBuild
-  },
   car: {
     name: 'Autós', desc: 'Versenyzés, minden csillag 1 km', unit: 'km',
     levels: RANKS,
@@ -77,7 +40,7 @@ export const WORLDS = {
     draw: drawMatch
   }
 };
-export const world = () => WORLDS[state.settings.world] || WORLDS.build;
+export const world = () => WORLDS[state.settings.world] || WORLDS.car;
 
 // hányadik szakasznál tart, és abban mennyi van kész
 export function buildProgress(blocks = state.game.blocks, w = world()) {
@@ -95,45 +58,6 @@ function setup(canvas, W, H) {
   canvas.style.height = (H * px) + 'px';
   const g = canvas.getContext('2d'); g.scale(dpr, dpr); g.imageSmoothingEnabled = false;
   return { g, px };
-}
-
-const COLORS = { S: '#8E949E', W: '#35507F', G: '#7A4B26', F: '#D6453D', P: '#5B3A1E', R: '#B5452F' };
-function shade(hex, f) {
-  const n = parseInt(hex.slice(1), 16);
-  const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.max(0, Math.min(255, Math.round(v * f))));
-  return `rgb(${c.join(',')})`;
-}
-function block(g, x, y, px, col) {
-  const e = Math.max(2, px / 7);
-  g.fillStyle = col; g.fillRect(x, y, px, px);
-  g.fillStyle = shade(col, 1.25); g.fillRect(x, y, px, e); g.fillRect(x, y, e, px);
-  g.fillStyle = shade(col, 0.7); g.fillRect(x, y + px - e, px, e); g.fillRect(x + px - e, y, e, px);
-}
-
-// Építő: alulról felfelé, balról jobbra
-function drawBuild(canvas, prog, fresh = 0) {
-  const { stage: build, placed } = prog;
-  const rows = build.rows, W = 16, H = rows.length + 1;
-  const { g, px } = setup(canvas, W, H);
-  const cells = [];
-  for (let r = rows.length - 1; r >= 0; r--) for (let c = 0; c < W; c++) if (rows[r][c] !== '.') cells.push([r, c, rows[r][c]]);
-  const ghost = getComputedStyle(document.documentElement).getPropertyValue('--line').trim() || '#ccc';
-  cells.forEach(([r, c, t], k) => {
-    const x = c * px, y = r * px;
-    if (k < placed) {
-      block(g, x, y, px, COLORS[t]);
-      if (t === 'W') { g.fillStyle = '#F2C14E'; g.fillRect(x + px * .3, y + px * .3, px * .4, px * .4); }
-      if (k >= placed - fresh) { g.strokeStyle = '#F2C14E'; g.lineWidth = 2; g.strokeRect(x + 1, y + 1, px - 2, px - 2); }
-    } else {
-      g.strokeStyle = ghost; g.lineWidth = 1; g.setLineDash([2, 2]); g.strokeRect(x + .5, y + .5, px - 1, px - 1); g.setLineDash([]);
-    }
-  });
-  const y = rows.length * px;
-  for (let c = 0; c < W; c++) {
-    g.fillStyle = '#6B4A2B'; g.fillRect(c * px, y, px, px);
-    g.fillStyle = '#5BAA3C'; g.fillRect(c * px, y, px, px * .35);
-    g.fillStyle = '#4A8F30'; g.fillRect(c * px + (c % 3) * px / 4, y + px * .35, px / 4, px / 6);
-  }
 }
 
 // Autós: garázs. Minden megnyert futam felold egy új, valódi autót (a gyűjtőkártyák fotóival).
@@ -261,7 +185,7 @@ export const BADGES = [
   { id: 'sorozat7', name: 'Egy hét', desc: '7 nap egymás után', glyph: '7', color: '#FF3D5A' },
   { id: 'villam', name: 'Speedrunner', desc: '10 pont a speedrunban', glyph: '⚡', color: '#B04DFF' },
   { id: 'kuldetes5', name: 'Kitartó', desc: '5 napi küldetés teljesítve', glyph: 'G', color: '#00D1C1' },
-  { id: 'epito', name: 'Építőmester', desc: 'Az első építmény kész', glyph: '▦', color: '#C08A4B' },
+  { id: 'epito', name: 'Első futam', desc: 'Először értél célba', glyph: '✓', color: '#C08A4B' },
   { id: 'vers', name: 'Az egész vers', desc: 'Egy egész vers megy fejből', glyph: '♛', color: '#FFD700' }
 ];
 
