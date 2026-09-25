@@ -1,14 +1,14 @@
-import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=38';
-import * as S from './store.js?v=38';
-import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=38';
-import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=38';
-import * as G from './game.js?v=38';
-import * as SH from './shop.js?v=38';
-import * as MM from './memes.js?v=38';
-import * as CD from './cards.js?v=38';
-import * as P from './pet.js?v=38';
-import { lineImages, lineScene, loadScenes } from './imagery.js?v=38';
-import { loadGloss, glossOf, hasGloss, stanzaAbout } from './gloss.js?v=38';
+import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=41';
+import * as S from './store.js?v=41';
+import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=41';
+import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=41';
+import * as G from './game.js?v=41';
+import * as SH from './shop.js?v=41';
+import * as MM from './memes.js?v=41';
+import * as CD from './cards.js?v=41';
+import * as P from './pet.js?v=41';
+import { lineImages, lineScene, loadScenes } from './imagery.js?v=41';
+import { loadGloss, glossOf, hasGloss, stanzaAbout } from './gloss.js?v=41';
 
 const app = document.getElementById('app');
 const I = {
@@ -119,6 +119,7 @@ VIEWS.home = () => {
         ${last ? `<button class="btn rapbtn px" id="rapgo">Rap mód</button>` : ''}
       </div>
     </section>
+    ${world && last && new Date().getHours() >= 18 && !S.eveningDone() && S.eveningTask(last) ? `<button class="evening" id="evening"><span class="moon" aria-hidden="true"></span><span class="grow"><b class="px">Esti ismétlés · 2 perc</b><br><span class="small">Alvás előtt ismételve sokkal jobban megmarad</span></span><span class="px">Indulás</span></button>` : ''}
     ${CD.col().packs ? `<button class="packbanner" id="packs"><span class="minipack" aria-hidden="true"></span><span class="grow"><b class="px">${CD.col().packs} csomag vár</b><br><span class="small">Bontsd ki, mi van benne</span></span><span class="px">Bontás</span></button>` : ''}
     <nav class="quick">
       ${world === 'pet' ? `<button class="qbtn" id="petbtn"><b class="px">${esc(P.petName())}</b><span>beszélgetés</span></button>` : ''}
@@ -149,6 +150,7 @@ VIEWS.home = () => {
   app.querySelector('#packs')?.addEventListener('click', () => go('pack'));
   app.querySelector('#garage')?.addEventListener('click', () => go('garage'));
   app.querySelector('#petbtn')?.addEventListener('click', () => go('pet'));
+  app.querySelector('#evening')?.addEventListener('click', () => { const t = S.eveningTask(last); if (t) startTask(last, t); });
   if (world === 'pet') mountHeroPet();
   app.querySelector('#speed')?.addEventListener('click', () => last && startTask(last, blitzTask(last, -1)));
   app.querySelector('#rapgo')?.addEventListener('click', () => {
@@ -453,7 +455,7 @@ function petHeroHTML(bp) {
 }
 let petApi = null, petVoices = new Map(), bubbleTimer;
 async function loadPet(canvas, frame) {
-  const mod = await import('./pet3d.js?v=38');
+  const mod = await import('./pet3d.js?v=41');
   const p = P.pet();
   const seen = Math.min(p.seen ?? petStage(), petStage());
   const api = await mod.mountPet(canvas, { frame, gender: p.g || 'm', stage: seen, hungry: P.hungry(), onTap: () => petTap() });
@@ -604,13 +606,13 @@ VIEWS.pet = ({ learn, exam } = {}) => {
   const openLesson = async (learnTask) => {
     if (!petApi) return;
     stopMic();
-    const { mountLesson } = await import('./lesson.js?v=38');
+    const { mountLesson } = await import('./lesson.js?v=41');
     const panel = app.querySelector('#lesson'), dock = app.querySelector('#pdock');
     dock.hidden = true; panel.hidden = false;
     const poem = (learnTask && S.getPoem(learn.id)) || S.getPoem(S.state.lastPoem) || S.state.poems[0];
     const nSt = parseStanzas(poem.text).length;
     const toLesson = t => ({ stanzas: t.stanzas, lines: t.lines, level: t.type,
-      label: t.type === 'fix' ? `Gyenge pontok · ${t.lines?.length || 0} sor`
+      label: t.kind === 'evening' ? `Esti ismétlés · ${t.lines?.length || 0} sor` : t.type === 'fix' ? `Gyenge pontok · ${t.lines?.length || 0} sor`
         : `${t.kind === 'review' ? 'Ismétlés · ' : t.kind === 'chain' || t.kind === 'whole' ? 'Egyben · ' : ''}${stanzaLabel(t.stanzas, nSt)} · ${EXERCISES[t.type].name}` });
     let current = learnTask;
     let rewards = 0;
@@ -642,7 +644,7 @@ VIEWS.pet = ({ learn, exam } = {}) => {
         toast(`+${rw.xp} XP${snacks ? ` · +${snacks} falat` : ''}${rw.levelUp ? ` · Új rang: ${rw.levelUp.name}` : ''}`);
         if (r.pass) { petApi?.react('great'); G.sfx(rw.levelUp ? 'level' : 'win'); if (r.mastered || r.wholeDone) petSay('Ügyes! Ez a versszak már megy!', 'stanzadone', 3000); else petSay('Ez nagyon jó volt!', 'great'); }
         else { petApi?.react('bad'); petSay('Majdnem! Próbáld újra!', 'tryagain'); }
-        const next = S.nextTask(poem);
+        const next = t.kind === 'evening' ? null : S.nextTask(poem);
         if (!next) { setTimeout(() => { petSay('Mára kész vagy! Szuper voltál!', 'wow', 3500); lesson.stop(); app.querySelector('#lesson').hidden = true; app.querySelector('#pdock').hidden = false; }, 2600); return; }
         current = next;
         lesson.start(toLesson(next), false);
@@ -655,7 +657,7 @@ VIEWS.pet = ({ learn, exam } = {}) => {
   const openExam = async (id) => {
     if (!petApi) return;
     stopMic();
-    const { mountExam } = await import('./exam.js?v=38');
+    const { mountExam } = await import('./exam.js?v=41');
     const panel = app.querySelector('#lesson'), dock = app.querySelector('#pdock');
     dock.hidden = true; panel.hidden = false;
     const poem = S.getPoem(id || S.state.lastPoem) || S.state.poems[0];
@@ -1126,6 +1128,10 @@ VIEWS.settings = () => {
     <div class="chips" id="voice">${Object.entries(voices).map(([k, l]) => `<button class="chip" data-v="${k}" aria-pressed="${cur === k}">${esc(l)}</button>`).join('')}</div>
     <button class="btn wide" id="try">Meghallgatom</button>
     <p class="muted small" style="margin:0">A beépített versekhez előre elkészített, természetes magyar felolvasás tartozik. Saját versnél a telefon saját felolvasója szól${canSpeak() ? '' : ', de ezen a készüléken nem találtam magyar hangot'}.</p>
+    <p class="label">Esti emlékeztető</p>
+    <p class="muted small" style="margin:0">Minden este szól a telefon naptára, és egy koppintással indul az esti ismétlés (2 perc).</p>
+    <div class="chips" id="evtime">${[19, 20, 21].map(h => `<button class="chip" data-h="${h}" aria-pressed="${(set.evHour || 20) === h}">${h}:00</button>`).join('')}</div>
+    <div class="row"><a class="btn grow" id="gcal" target="_blank" rel="noopener">Google Naptár (Android)</a><button class="btn grow" id="ics">Naptárfájl (iPhone)</button></div>
     <p class="label">Autófotók</p>
     <button class="btn wide" id="credits">Fotók forrása és licence</button>
     <p class="label">Adatok</p>
@@ -1134,6 +1140,17 @@ VIEWS.settings = () => {
   app.querySelectorAll('#size .chip').forEach(b => b.onclick = () => { S.setSize(+b.dataset.v); VIEWS.settings(); });
   app.querySelectorAll('#world .chip').forEach(b => b.onclick = () => { setWorld(b.dataset.v); VIEWS.settings(); });
   app.querySelector('#credits').onclick = () => go('credits');
+  const evUrl = location.origin + location.pathname + '#esti';
+  const evH = set.evHour || 20, d0 = new Date(); d0.setHours(evH, 0, 0, 0); if (d0 < new Date()) d0.setDate(d0.getDate() + 1);
+  const pad = n => String(n).padStart(2, '0'), stamp = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+  const d1 = new Date(d0.getTime() + 5 * 60000);
+  app.querySelector('#gcal').href = 'https://calendar.google.com/calendar/render?' + new URLSearchParams({ action: 'TEMPLATE', text: 'Fejből: esti ismétlés (2 perc)', details: 'Koppints ide: ' + evUrl, dates: stamp(d0) + '/' + stamp(d1), recur: 'RRULE:FREQ=DAILY' });
+  app.querySelector('#ics').onclick = () => {
+    const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Fejbol//HU', 'BEGIN:VEVENT', 'UID:fejbol-esti@aluminiumboy.github.io', 'DTSTAMP:' + stamp(new Date()), 'DTSTART:' + stamp(d0), 'DTEND:' + stamp(d1),
+      'RRULE:FREQ=DAILY', 'SUMMARY:Fejből: esti ismétlés (2 perc)', 'DESCRIPTION:' + evUrl, 'URL:' + evUrl, 'BEGIN:VALARM', 'TRIGGER:PT0M', 'ACTION:DISPLAY', 'DESCRIPTION:Esti ismétlés a rókával', 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' })); a.download = 'fejbol-esti-ismetles.ics'; a.click();
+  };
+  app.querySelectorAll('#evtime .chip').forEach(b => b.onclick = () => { set.evHour = +b.dataset.h; S.save(); VIEWS.settings(); });
   app.querySelectorAll('#lmic .chip').forEach(b => b.onclick = () => { set.lessonMic = b.dataset.v === '1'; S.save(); VIEWS.settings(); });
   app.querySelectorAll('#buddy .chip').forEach(b => b.onclick = () => { set.buddy = b.dataset.v === '1'; S.save(); VIEWS.settings(); });
   app.querySelectorAll('#paper .chip').forEach(b => b.onclick = () => { set.paper = b.dataset.v === '1'; S.save(); document.documentElement.dataset.paper = set.paper ? '1' : '0'; VIEWS.settings(); });
@@ -1203,4 +1220,13 @@ document.addEventListener('click', e => {
   const ab = e.target.closest('[data-about]'); if (ab) showAbout(+ab.dataset.about);
 }, true);
 go('home', {}, false);
+// a naptár-emlékeztető linkje (#esti) az esti ismétlést nyitja meg — betöltéskor és ha az app már nyitva volt
+function checkEsti() {
+  if (location.hash !== '#esti') return;
+  history.replaceState(history.state, '', location.pathname);
+  const p = S.getPoem(S.state.lastPoem) || S.state.poems[0], t = p && S.eveningTask(p);
+  if (t) startTask(p, t); else toast('Ma még nem tanultál, holnap este ismétlünk!');
+}
+checkEsti();
+window.addEventListener('hashchange', checkEsti);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

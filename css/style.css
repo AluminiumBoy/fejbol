@@ -719,3 +719,10 @@ img.tc-img.sil{filter:brightness(0) opacity(.45);background:none}
 .exgrade .g2,.exgrade .g1{color:var(--bad)}
 .exgrade b{font-size:1.3rem}
 .btn.examopen{min-height:48px;background:rgba(28,20,48,.62);border-color:rgba(255,255,255,.18);font-weight:800}
+
+/* ===== esti ismétlés ===== */
+.evening{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;border-radius:16px;padding:12px 14px;color:#EDEBFF;
+  background:linear-gradient(120deg,#1C1A4A,#3A2A7A 60%,#5A3A9A);box-shadow:0 10px 30px -12px rgba(90,58,154,.8),inset 0 0 0 1px rgba(255,255,255,.12)}
+.evening b{font-size:1.2rem}
+.evening > .px:last-child{background:#FFE08A;color:#1C1A4A;border-radius:10px;padding:6px 12px;font-size:1.05rem}
+.moon{width:34px;height:34px;border-radius:50%;flex:none;box-shadow:inset -9px -3px 0 0 #FFE08A;transform:rotate(-20deg)}

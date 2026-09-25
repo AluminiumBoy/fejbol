@@ -1,6 +1,6 @@
 // Képes emlékeztető (kettős kódolás): minden sorhoz néhány kép, amit a róka "elképzel".
 // A beépített vershez kézzel válogatott képek, más versekhez kulcsszó-szótár.
-import { words, norm } from './text.js?v=38';
+import { words, norm } from './text.js?v=41';
 
 const CURATED = {
   'Itt van az ősz, itt van ujra,': '🍂🔁',

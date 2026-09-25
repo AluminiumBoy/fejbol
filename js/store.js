@@ -1,5 +1,5 @@
 // Tárolás (a böngészőben) és a tanulási út ütemezése
-import { parseStanzas } from './text.js?v=38';
+import { parseStanzas } from './text.js?v=41';
 
 const KEY = 'fejbol.v3';
 const DAY = 864e5;
@@ -147,6 +147,21 @@ export function weakLines(poem, max = 6) {
 }
 export const weakness = (poem, si, li) => { const e = poem.weak?.[si + '.' + li]; return e ? Math.max(0, Math.min(1, (e.miss * 1.5 - e.ok) / 4)) : 0; };
 
+// ---- esti ismétlés: a nap folyamán gyakorolt sorok (legfeljebb 8), vagy az éppen tanult versszak ----
+export function eveningTask(poem) {
+  const today = dayKey();
+  let refs = Object.entries(poem.weak || {}).filter(([, e]) => e.t && dayKey(e.t) === today).map(([k]) => k.split('.').map(Number));
+  refs.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (!refs.length) {
+    const i = poem.stanzas.findIndex(p => p.step > 0 && p.step < PATH.length);
+    if (i < 0) return null;
+    refs = parseStanzas(poem.text)[i].map((_, li) => [i, li]);
+  }
+  refs = refs.slice(0, 8);
+  return { type: 'solo', stanzas: [...new Set(refs.map(r => r[0]))], lines: refs, kind: 'evening' };
+}
+export const eveningDone = () => state.eveningDay === dayKey();
+
 // ---- napi statisztika ----
 export const dayKey = (t = Date.now()) => { const d = new Date(t); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
 export const todayCount = () => state.days[dayKey()] || 0;
@@ -199,6 +214,8 @@ export function applyResult(poem, task, score) {
     const p = poem.stanzas[task.stanzas[0]];
     if (pass) { p.due = now + INTERVALS[Math.min(p.reviews, INTERVALS.length - 1)] * DAY; p.reviews++; }
     else { p.step = PATH.indexOf('alt'); p.due = 0; }
+  } else if (task.kind === 'evening') {
+    state.eveningDay = dayKey();
   } else if (task.kind === 'weak') {
     poem.weakDay = dayKey();
   } else if (task.kind === 'chain') {
