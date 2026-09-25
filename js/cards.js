@@ -1,6 +1,6 @@
-// Gyűjtőkártyák: 30 kitalált autó, ritkaságokkal. Csomag jár a napi küldetésért, versszakért, egész versért.
-import { state, save } from './store.js?v=14';
-import { drawCarV } from './game.js?v=14';
+// Gyűjtőkártyák: 30 valódi autó fotóval (Wikimedia Commons, szabad licenc) és gyári adatokkal.
+// Csomag jár a napi küldetésért, versszakért, egész versért.
+import { state, save } from './store.js?v=15';
 
 export const RARITY = {
   common: { name: 'Sima', weight: 55, xpDup: 10 },
@@ -10,72 +10,57 @@ export const RARITY = {
 };
 const RORDER = ['common', 'rare', 'epic', 'legend'];
 
-// alak-sablonok a rajzolóhoz
-const S = {
-  hatch: { r1: .14, r2: .62, rh: .14, bh: .17, hood: .03, wr: .095, ride: 1 },
-  sedan: { r1: .25, r2: .66, rh: .12, bh: .16, hood: .04, wr: .09, ride: .9 },
-  wagon: { r1: .1, r2: .66, rh: .13, bh: .16, hood: .04, wr: .09, ride: .9 },
-  van: { r1: .06, r2: .72, rh: .2, bh: .2, hood: .06, wr: .095, ride: 1.1 },
-  suv: { r1: .1, r2: .62, rh: .16, bh: .2, hood: .02, wr: .115, ride: 1.6 },
-  pickup: { r1: .42, r2: .7, rh: .15, bh: .18, hood: .02, wr: .115, ride: 1.6 },
-  coupe: { r1: .3, r2: .64, rh: .1, bh: .14, hood: .05, wr: .09, ride: .7 },
-  muscle: { r1: .3, r2: .57, rh: .11, bh: .18, hood: .015, wr: .1, ride: .9 },
-  buggy: { r1: .35, r2: .6, rh: .1, bh: .1, hood: .04, wr: .13, ride: 2 },
-  formula: { r1: .44, r2: .56, rh: .06, bh: .085, hood: .045, wr: .115, ride: .5 },
-  hyper: { r1: .32, r2: .62, rh: .085, bh: .12, hood: .07, wr: .09, ride: .55 }
-};
-
+// hp: lóerő (LE), acc: 0-100 km/h másodpercben, top: végsebesség km/h (kerekített gyári adatok)
+// face: merre néz az autó eleje a fotón (L balra, R jobbra)
 export const CARDS = [
-  // sima
-  { n: 'Városi Kompakt', r: 'common', s: 'hatch', color: '#4A90D9' },
-  { n: 'Családi Szedán', r: 'common', s: 'sedan', color: '#8C939F' },
-  { n: 'Kombi', r: 'common', s: 'wagon', color: '#3F7F5A' },
-  { n: 'Kisbusz', r: 'common', s: 'van', color: '#F2F2F2' },
-  { n: 'Pickup', r: 'common', s: 'pickup', color: '#B5462F' },
-  { n: 'Taxi', r: 'common', s: 'sedan', color: '#F5C518', sign: 1 },
-  { n: 'Városi Terepjáró', r: 'common', s: 'suv', color: '#5C6B7A' },
-  { n: 'Retro Kupé', r: 'common', s: 'coupe', color: '#D98C3A' },
-  { n: 'Postás Furgon', r: 'common', s: 'van', color: '#E8B90F', stripe: '#2B5FB0' },
-  { n: 'Tanulóautó', r: 'common', s: 'hatch', color: '#E24A4A' },
-  { n: 'Erdei Terepjáró', r: 'common', s: 'suv', color: '#4D6B35' },
-  { n: 'Mini Kupé', r: 'common', s: 'coupe', color: '#9B59D0' },
-  // ritka
-  { n: 'Rendőrautó', r: 'rare', s: 'sedan', color: '#F4F6FA', stripe: '#1F4FB8', bar: ['#FF2B3D', '#2B6BFF'] },
-  { n: 'Mentő', r: 'rare', s: 'van', color: '#F4F6FA', stripe: '#E03A3A', bar: ['#2B6BFF', '#2B6BFF'] },
-  { n: 'Tűzoltó Parancsnok', r: 'rare', s: 'suv', color: '#D42A2A', stripe: '#F4F6FA', bar: ['#FF2B3D', '#FFB02B'] },
-  { n: 'Sportkupé', r: 'rare', s: 'coupe', color: '#1F8FFF', spoiler: 1 },
-  { n: 'Rali Bajnok', r: 'rare', s: 'hatch', color: '#1C3F9E', stripe: '#F5C518', spoiler: 2 },
-  { n: 'Drift Kupé', r: 'rare', s: 'coupe', color: '#E0457B', spoiler: 2 },
-  { n: 'Muscle Classic', r: 'rare', s: 'muscle', color: '#2E2F36', stripe: '#F4F4F4' },
-  { n: 'Sivatagi Buggy', r: 'rare', s: 'buggy', color: '#E07B2A' },
-  { n: 'Street Tuner', r: 'rare', s: 'sedan', color: '#23C483', spoiler: 1 },
-  // epikus
-  { n: 'Éjféli Tuner', r: 'epic', s: 'coupe', color: '#1C1F28', neon: '#00F0FF', spoiler: 2, stripe: '#00F0FF' },
-  { n: 'Szuperkupé', r: 'epic', s: 'hyper', color: '#E32B2B', spoiler: 2 },
-  { n: 'GT3 Pályaautó', r: 'epic', s: 'hyper', color: '#F4F6FA', stripe: '#1F8FFF', spoiler: 3 },
-  { n: 'Formula Junior', r: 'epic', s: 'formula', color: '#1F6FE0', spoiler: 3, stripe: '#F4F4F4' },
-  { n: 'Neon Runner', r: 'epic', s: 'coupe', color: '#6A2BD9', neon: '#FF2BD6', spoiler: 2 },
-  { n: 'Hegyi Rali', r: 'epic', s: 'suv', color: '#F4F6FA', stripe: '#E32B2B', spoiler: 1 },
-  // legendás
-  { n: 'Aranyvillám', r: 'legend', s: 'hyper', color: '#E3A50B', spoiler: 3, stripe: '#1C1F28' },
-  { n: 'Hiperkar X', r: 'legend', s: 'hyper', color: '#00B89C', neon: '#00F0FF', spoiler: 3 },
-  { n: 'Fantom', r: 'legend', s: 'hyper', color: '#15161C', neon: '#B04DFF', spoiler: 3, stripe: '#B04DFF' }
-].map((c, i) => ({ ...S[c.s], ...c, id: 'c' + (i + 1), no: i + 1, name: c.n }));
+  { id: 'c1', no: 1, name: "Volkswagen Golf GTI", r: 'common', hp: 245, acc: 6.3, top: 250, face: 'L', by: "Damian B Oh", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Volkswagen_Golf_GTI_Mk8_Dolphin_Gray_Metallic_(2).jpg" },
+  { id: 'c2', no: 2, name: "Honda Civic Type R", r: 'common', hp: 329, acc: 5.4, top: 275, face: 'R', by: "Dinkun Chen", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:HONDA_CIVIC_TYPE_R_FL5_China_(5).jpg" },
+  { id: 'c3', no: 3, name: "Toyota GR Yaris", r: 'common', hp: 261, acc: 5.5, top: 230, face: 'R', by: "Alexander Migl", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Toyota_GR_Yaris_RZ_1X7A0252.jpg" },
+  { id: 'c4', no: 4, name: "Ford Fiesta ST", r: 'common', hp: 200, acc: 6.5, top: 232, face: 'R', by: "Vauxford", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:2018_Ford_Fiesta_ST-2_Turbo_1.5.jpg" },
+  { id: 'c5', no: 5, name: "Mini John Cooper Works", r: 'common', hp: 231, acc: 6.1, top: 246, face: 'R', by: "Nikolai Bulykin", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:%D0%90%D0%BB%D0%BC%D0%B0%D1%82%D1%8B,_Mini_John_Cooper_Works_F56_%D0%BD%D0%B0_%D0%90%D1%83%D1%8D%D0%B7%D0%BE%D0%B2%D0%B0-%D0%A2%D0%B8%D0%BC%D0%B8%D1%80%D1%8F%D0%B7%D0%B5%D0%B2%D0%B0.jpg" },
+  { id: 'c6', no: 6, name: "Hyundai i30 N", r: 'common', hp: 275, acc: 6.1, top: 250, face: 'L', by: "Vauxford", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:2018_Hyundai_i30_N_Performance_T-GDi_2.0.jpg" },
+  { id: 'c7', no: 7, name: "Suzuki Swift Sport", r: 'common', hp: 140, acc: 8.1, top: 210, face: 'L', by: "Vauxford", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:2018_Suzuki_Swift_Sport_Boosterjet_1.4.jpg" },
+  { id: 'c8', no: 8, name: "Škoda Octavia RS", r: 'common', hp: 245, acc: 6.7, top: 250, face: 'L', by: "Alexander Migl", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Skoda_Octavia_IV_Combi_RS_IMG_3534.jpg" },
+  { id: 'c9', no: 9, name: "Mazda MX-5", r: 'common', hp: 160, acc: 7.3, top: 214, face: 'L', by: "EurovisionNim", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:2015_Mazda_MX-5_(ND)_Roadster_GT_convertible_(2018-10-30)_01.jpg" },
+  { id: 'c10', no: 10, name: "Renault Clio RS 200", r: 'common', hp: 200, acc: 6.9, top: 225, face: 'R', by: "Jeremy from Sydney, Australia", lic: 'CC BY 2.0', src: "https://commons.wikimedia.org/wiki/File:2012_Renault_Sport_Clio_(X85_MY12)_200_Cup_3-door_hatchback_(28682464861).jpg" },
+  { id: 'c11', no: 11, name: "Abarth 595", r: 'common', hp: 180, acc: 6.7, top: 225, face: 'R', by: "Alexander Migl", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Fiat_Abarth_595_esseesse_IMG_3014.jpg" },
+  { id: 'c12', no: 12, name: "Toyota GR86", r: 'common', hp: 234, acc: 6.3, top: 226, face: 'L', by: "TTTNIS", lic: 'CC0', src: "https://commons.wikimedia.org/wiki/File:Toyota_GR86_SZ.jpg" },
+  { id: 'c13', no: 13, name: "Ford Mustang GT", r: 'rare', hp: 450, acc: 4.3, top: 250, face: 'R', by: "Calreyn88", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:2018_Ford_Mustang_GT_2.jpg" },
+  { id: 'c14', no: 14, name: "BMW M3 Competition", r: 'rare', hp: 510, acc: 3.9, top: 290, face: 'L', by: "Tomtom7777", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:BMW_M3_Competition_G80_LCI_in_La_Jolla,_California_(May_14,_2026).png" },
+  { id: 'c15', no: 15, name: "Toyota GR Supra", r: 'rare', hp: 340, acc: 4.3, top: 250, face: 'R', by: "Charles from Port Chester, New York", lic: 'CC BY 2.0', src: "https://commons.wikimedia.org/wiki/File:Toyota_GR_Supra_(2021)_(53686019489).jpg" },
+  { id: 'c16', no: 16, name: "Nissan GT-R", r: 'rare', hp: 530, acc: 3.0, top: 315, face: 'R', by: "Dinkun Chen", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:NISSAN_GT-R_(R35,_2011_FACELIFT)_China.jpg" },
+  { id: 'c17', no: 17, name: "Audi RS 3", r: 'rare', hp: 400, acc: 3.8, top: 290, face: 'L', by: "Alexander-93", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Audi_RS3_8Y_IMG_8404.jpg" },
+  { id: 'c18', no: 18, name: "Mercedes-AMG A 45 S", r: 'rare', hp: 421, acc: 3.9, top: 270, face: 'L', by: "Alexander Migl", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Mercedes-AMG_A_45_S_4MATIC%2B_(W177)_1X7A0312.jpg" },
+  { id: 'c19', no: 19, name: "Chevrolet Corvette C8", r: 'rare', hp: 502, acc: 3.5, top: 312, face: 'L', by: "Alexander Migl", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Chevrolet_Corvette_C8_IAA_2021_1X7A0156.jpg" },
+  { id: 'c20', no: 20, name: "Dodge Challenger SRT8", r: 'rare', hp: 492, acc: 4.5, top: 293, face: 'L', by: "Ermell", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Dodge_Challenger_SRT8_(2015)_Hirschaid-20220709-RM-120221.jpg" },
+  { id: 'c21', no: 21, name: "Alpine A110", r: 'rare', hp: 252, acc: 4.5, top: 250, face: 'L', by: "Kakoula10", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Alpine_A110_vue_de_profil.jpg" },
+  { id: 'c22', no: 22, name: "Lamborghini Huracán Tecnica", r: 'epic', hp: 640, acc: 3.2, top: 325, face: 'L', by: "Alexander-93", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Lamborghini_Hurac%C3%A1n_Tecnica_1X7A7430.jpg" },
+  { id: 'c23', no: 23, name: "Ferrari SF90 Stradale", r: 'epic', hp: 1000, acc: 2.5, top: 340, face: 'L', by: "Calreyn88", lic: 'CC BY 4.0', src: "https://commons.wikimedia.org/wiki/File:Ferrari_SF90_Stradale_Mayfair.jpg" },
+  { id: 'c24', no: 24, name: "McLaren 720S", r: 'epic', hp: 720, acc: 2.9, top: 341, face: 'L', by: "Matti Blume", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:McLaren_720S,_IAA_2017,_(1Y7A3405).jpg" },
+  { id: 'c25', no: 25, name: "Audi R8 V10 performance", r: 'epic', hp: 620, acc: 3.1, top: 331, face: 'L', by: "Damian B Oh", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Audi_R8_V10_Performance_4S_FL_Java_Green_Metallic_(1).jpg" },
+  { id: 'c26', no: 26, name: "Porsche Taycan Turbo S", r: 'epic', hp: 761, acc: 2.8, top: 260, face: 'L', by: "Calreyn88", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:2020_Porsche_Taycan_Turbo_S_(21742).jpg" },
+  { id: 'c27', no: 27, name: "Mercedes-AMG GT Black Series", r: 'epic', hp: 730, acc: 3.2, top: 325, face: 'R', by: "Alexander-93", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Mercedes-AMG_GT_Black_Series_IMG_0324.jpg" },
+  { id: 'c28', no: 28, name: "Bugatti Chiron", r: 'legend', hp: 1500, acc: 2.4, top: 420, face: 'L', by: "Matti Blume", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Bugatti_Chiron_110_Ans,_GIMS_2019,_Le_Grand-Saconnex_(GIMS9979).jpg" },
+  { id: 'c29', no: 29, name: "Porsche 911 GT3 RS", r: 'legend', hp: 525, acc: 3.2, top: 296, face: 'L', by: "Alexander Migl", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Porsche_992_GT3_RS_DSC_9055.jpg" },
+  { id: 'c30', no: 30, name: "Koenigsegg Agera RS", r: 'legend', hp: 1176, acc: 2.8, top: 447, face: 'R', by: "Calreyn88", lic: 'CC BY-SA 4.0', src: "https://commons.wikimedia.org/wiki/File:Koenigsegg_Agera_RST_2.jpg" }
+].map(c => ({ ...c, img: `img/cars/${c.id}.webp` }));
+export const cardById = id => CARDS.find(c => c.id === id);
 
-// értékek a kártyán: az alakból és a ritkaságból, mindig ugyanazok
-function seeded(n) { let x = n * 7919 + 13; return () => ((x = (x * 9301 + 49297) % 233280) / 233280); }
+const fmt = n => String(n).replace('.', ',');
 export function stats(c) {
-  const rnd = seeded(c.no), base = { common: 45, rare: 62, epic: 76, legend: 88 }[c.r];
-  const sport = ['coupe', 'hyper', 'formula', 'muscle'].includes(c.s) ? 8 : c.s === 'van' ? -10 : 0;
-  const v = k => Math.max(20, Math.min(99, Math.round(base + sport + k + rnd() * 10 - 5)));
-  return [['Gyorsulás', v(c.s === 'muscle' ? 6 : 0)], ['Végsebesség', v(c.s === 'formula' ? 6 : 0)], ['Kezelhetőség', v(c.s === 'buggy' || c.s === 'hatch' ? 5 : 0)]];
+  const pct = (v, lo, hi) => Math.round(Math.max(6, Math.min(100, (v - lo) / (hi - lo) * 100)));
+  return [
+    ['Teljesítmény', `${c.hp} LE`, pct(c.hp, 80, 1500)],
+    ['0–100 km/h', `${fmt(c.acc)} s`, pct(9.5 - c.acc, 0, 7.3)],
+    ['Végsebesség', `${c.top} km/h`, pct(c.top, 180, 450)]
+  ];
 }
 
 export function col() {
   state.cards = Object.assign({ owned: {}, packs: 1, opened: 0 }, state.cards || {});
   return state.cards;
 }
-export const ownedCount = () => Object.keys(col().owned).length;
+export const ownedCount = () => Object.keys(col().owned).filter(id => cardById(id)).length;
 
 // csomag: 3 kártya, a harmadik legalább ritka; ha lehet, új lapot ad
 function rollRarity(minIdx = 0) {
@@ -108,27 +93,20 @@ export function givePacks(n) { if (n > 0) { col().packs += n; save(); } }
 
 // ---------- megjelenítés ----------
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-export function cardHTML(c, { locked = false, small = false } = {}) {
-  if (locked) return `<div class="tcard locked ${small ? 'sm' : ''}"><div class="tc-in"><span class="tc-q px">?</span><span class="tc-no px">#${c.no}</span></div></div>`;
+export function cardHTML(c, { locked = false, small = false, credit = false } = {}) {
+  if (locked) return `<div class="tcard locked ${small ? 'sm' : ''}"><div class="tc-in"><img class="tc-img sil" src="${c.img}" alt="" loading="lazy"><span class="tc-no px">#${c.no}</span></div></div>`;
   return `<div class="tcard r-${c.r} ${small ? 'sm' : ''}" data-card="${c.id}">
     <div class="tc-in">
       <div class="tc-top"><span class="tc-rar px">${RARITY[c.r].name}</span><span class="tc-no px">#${c.no}</span></div>
-      <canvas class="tc-img" data-car="${c.id}"></canvas>
+      <img class="tc-img" src="${c.img}" alt="${esc(c.name)}" loading="lazy" draggable="false">
       <b class="tc-name px">${esc(c.name)}</b>
-      ${small ? '' : `<div class="tc-stats">${stats(c).map(([l, v]) => `<div><span>${l}</span><i><i style="width:${v}%"></i></i><b>${v}</b></div>`).join('')}</div>`}
+      ${small ? '' : `<div class="tc-stats">${stats(c).map(([l, v, p]) => `<div><span>${l}</span><i><i style="width:${p}%"></i></i><b>${v}</b></div>`).join('')}</div>`}
+      ${credit ? `<span class="tc-credit">Fotó: ${esc(c.by)} · ${c.lic}</span>` : ''}
     </div>
     ${c.r === 'epic' || c.r === 'legend' ? '<div class="tc-holo"></div>' : ''}<div class="tc-glare"></div>
   </div>`;
 }
-export function paintCards(root) {
-  root.querySelectorAll('canvas.tc-img').forEach(cv => {
-    const c = CARDS.find(x => x.id === cv.dataset.car); if (!c) return;
-    const w = cv.clientWidth || 200, h = Math.round(w * .5), dpr = window.devicePixelRatio || 1;
-    cv.width = w * dpr; cv.height = h * dpr; cv.style.height = h + 'px';
-    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawCarV(g, w * .06, h * .86, w * .88, c);
-  });
-}
+export function paintCards() {}
 
 // hologram: dőlés az ujj / egér helyzete szerint, telefonon a döntés szerint is
 export function tilt(el) {

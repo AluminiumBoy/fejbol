@@ -1,5 +1,6 @@
 // Játékréteg: XP, szintek, blokkok és építkezés, jelvények, napi küldetés, hangeffektek
-import { state, save, streak, dayKey } from './store.js?v=14';
+import { state, save, streak, dayKey } from './store.js?v=15';
+import { cardById } from './cards.js?v=15';
 
 export const MISSION_SIZE = 3;
 
@@ -135,21 +136,9 @@ function drawBuild(canvas, prog, fresh = 0) {
   }
 }
 
-// Autós: garázs. Minden megnyert futam felold egy új autót.
-// Oldalnézeti autók paraméterekből (hossz arányában): r1/r2 tető eleje-vége, rh tetőmagasság,
-// bh karosszéria magasság, hood motorháztető lejtése, wr kerék sugár, ride hasmagasság, spoiler, neon
-export const CARS = [
-  { id: 'kiscsavo', name: 'Kiscsávó', color: '#E8672C', r1: .14, r2: .62, rh: .14, bh: .17, hood: .03, wr: .095, ride: 1 },
-  { id: 'street', name: 'Street Racer', color: '#2F6FE0', r1: .27, r2: .66, rh: .115, bh: .15, hood: .04, wr: .09, ride: .8, spoiler: 1 },
-  { id: 'drift', name: 'Drift King', color: '#8A4FE0', neon: '#00F0FF', r1: .3, r2: .64, rh: .1, bh: .14, hood: .05, wr: .09, ride: .7, spoiler: 2 },
-  { id: 'muscle', name: 'Muscle Beast', color: '#D93A3A', r1: .3, r2: .57, rh: .11, bh: .18, hood: .015, wr: .1, ride: .9, stripe: '#F4F4F4' },
-  { id: 'terep', name: 'Terepszörny', color: '#6E8B3D', r1: .1, r2: .6, rh: .16, bh: .2, hood: .02, wr: .125, ride: 1.9 },
-  { id: 'formula', name: 'Formula', color: '#E32B2B', r1: .44, r2: .56, rh: .06, bh: .085, hood: .045, wr: .115, ride: .5, spoiler: 3, stripe: '#F4F4F4' },
-  { id: 'hyper', name: 'Hypercar', color: '#00B89C', r1: .32, r2: .62, rh: .085, bh: .12, hood: .07, wr: .09, ride: .55, spoiler: 2 },
-  { id: 'ghost', name: 'Neon Ghost', color: '#1C1F28', neon: '#FF2BD6', r1: .32, r2: .62, rh: .085, bh: .12, hood: .07, wr: .09, ride: .55, spoiler: 2, stripe: '#FF2BD6' },
-  { id: 'goat', name: 'GOAT GT', color: '#E3A50B', r1: .33, r2: .61, rh: .08, bh: .115, hood: .075, wr: .095, ride: .5, spoiler: 3, stripe: '#1C1F28' }
-];
-// hány autó van feloldva: 1 + a megnyert futamok száma
+// Autós: garázs. Minden megnyert futam felold egy új, valódi autót (a gyűjtőkártyák fotóival).
+const GARAGE = ['c7', 'c1', 'c3', 'c15', 'c14', 'c16', 'c22', 'c23', 'c28'];
+export const CARS = GARAGE.map(cardById);
 const carsUnlockedAt = b => Math.min(CARS.length, 1 + buildProgress(b, WORLDS.car).finished);
 export const carsUnlocked = () => carsUnlockedAt(state.game.blocks);
 export function activeCar() {
@@ -158,106 +147,13 @@ export function activeCar() {
   return CARS[i >= 0 && i < n ? i : n - 1];
 }
 
-// Autó rajzolása oldalnézetből. x: hátsó vége, y: talaj, L: hossz pixelben. Előre (jobbra) néz.
-export function drawCarV(g, x, y, L, c, { alpha = 1, silhouette = false, glow = true } = {}) {
-  g.save(); g.globalAlpha = alpha;
-  const r = L * c.wr, yb = y - r * c.ride - r * .35, yt = yb - L * c.bh, yr = yt - L * c.rh;
-  const X = f => x + L * f;
-  const dark = silhouette ? '#20242E' : shade(c.color, .45);
-  // árnyék és neon aláfény
-  g.fillStyle = 'rgba(0,0,0,.45)';
-  g.beginPath(); g.ellipse(X(.5), y + r * .08, L * .5, r * .22, 0, 0, Math.PI * 2); g.fill();
-  if (c.neon && !silhouette && glow) {
-    const ng = g.createRadialGradient(X(.5), y, 1, X(.5), y, L * .55);
-    ng.addColorStop(0, c.neon + 'AA'); ng.addColorStop(1, c.neon + '00');
-    g.fillStyle = ng; g.beginPath(); g.ellipse(X(.5), y, L * .6, r * .7, 0, 0, Math.PI * 2); g.fill();
-  }
-  // karosszéria
-  const body = new Path2D();
-  body.moveTo(X(.03), yb);
-  body.lineTo(X(.008), yt + L * .035);
-  body.quadraticCurveTo(X(0), yt, X(.05), yt);
-  body.lineTo(X(c.r1 - .05), yt);
-  body.quadraticCurveTo(X(c.r1 + .01), yr, X(c.r1 + .09), yr);
-  body.lineTo(X(c.r2 - .07), yr);
-  body.quadraticCurveTo(X(c.r2 + .02), yr + L * .005, X(c.r2 + .13), yt);
-  body.lineTo(X(.955), yt + L * c.hood);
-  body.quadraticCurveTo(X(1), yt + L * c.hood, X(.995), yb - L * .025);
-  body.quadraticCurveTo(X(.99), yb, X(.95), yb);
-  body.closePath();
-  if (silhouette) g.fillStyle = '#20242E';
-  else {
-    const bg = g.createLinearGradient(0, yr, 0, yb);
-    bg.addColorStop(0, shade(c.color, 1.35)); bg.addColorStop(.45, c.color); bg.addColorStop(1, shade(c.color, .5));
-    g.fillStyle = bg;
-  }
-  g.fill(body);
-  // kerékjárati ívek
-  const wx = [X(.2), X(.8)], wy = y - r;
-  g.fillStyle = '#0A0B0F';
-  wx.forEach(cx => { g.beginPath(); g.arc(cx, wy, r * 1.16, Math.PI, 0); g.lineTo(cx + r * 1.16, yb + 1); g.lineTo(cx - r * 1.16, yb + 1); g.fill(); });
-  if (!silhouette) {
-    // üvegek
-    const inset = L * .018;
-    const glass = new Path2D();
-    glass.moveTo(X(c.r1 - .02), yt - inset * .3);
-    glass.quadraticCurveTo(X(c.r1 + .025), yr + inset, X(c.r1 + .095), yr + inset);
-    glass.lineTo(X(c.r2 - .075), yr + inset);
-    glass.quadraticCurveTo(X(c.r2 + .005), yr + inset, X(c.r2 + .1), yt - inset * .3);
-    glass.closePath();
-    const gg = g.createLinearGradient(0, yr, 0, yt);
-    gg.addColorStop(0, '#A9D8FF'); gg.addColorStop(1, '#1D2A44');
-    g.fillStyle = gg; g.fill(glass);
-    // ajtóoszlop
-    g.fillStyle = shade(c.color, .6);
-    g.fillRect(X((c.r1 + c.r2) / 2 + .01), yr + inset, L * .018, yt - yr - inset);
-    // csík
-    if (c.stripe) { g.fillStyle = c.stripe; g.globalAlpha = alpha * .9; g.fillRect(X(.04), yt + (yb - yt) * .42, L * .9, Math.max(2, (yb - yt) * .12)); g.globalAlpha = alpha; }
-    // fényes perem
-    g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = Math.max(1, L * .006);
-    g.beginPath(); g.moveTo(X(.05), yt + L * .012); g.lineTo(X(c.r1 - .04), yt + L * .012); g.moveTo(X(c.r2 + .14), yt + L * .012); g.lineTo(X(.94), yt + L * c.hood + L * .012); g.stroke();
-    // ajtóvonal
-    g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = Math.max(1, L * .004);
-    g.beginPath(); g.moveTo(X(c.r1 + .02), yt + 2); g.lineTo(X(c.r1 + .02), yb - r * .6); g.moveTo(X(c.r2 + .06), yt + 2); g.lineTo(X(c.r2 + .06), yb - r * .6); g.stroke();
-    // lámpák
-    g.fillStyle = '#FFF3B0'; g.shadowColor = '#FFE27A'; g.shadowBlur = glow ? L * .05 : 0;
-    g.beginPath(); g.ellipse(X(.975), yt + L * c.hood + (yb - yt) * .2, L * .016, (yb - yt) * .12, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#FF2B3D'; g.shadowColor = '#FF2B3D';
-    g.fillRect(X(.006), yt + (yb - yt) * .18, L * .02, (yb - yt) * .22);
-    g.shadowBlur = 0;
-    // villogó vagy taxitábla a tetőn
-    if (c.bar) {
-      const bw = L * .12, bx = X((c.r1 + c.r2) / 2) - bw / 2, bh = L * .022;
-      g.fillStyle = '#2A2E38'; g.fillRect(bx, yr - bh * .6, bw, bh * .6);
-      c.bar.forEach((col, k) => { g.fillStyle = col; g.shadowColor = col; g.shadowBlur = glow ? L * .04 : 0; g.fillRect(bx + k * bw / 2 + 1, yr - bh * 1.3, bw / 2 - 2, bh * .8); });
-      g.shadowBlur = 0;
-    }
-    if (c.sign) {
-      const bw = L * .1, bx = X((c.r1 + c.r2) / 2) - bw / 2, bh = L * .035;
-      g.fillStyle = '#FFE14D'; g.fillRect(bx, yr - bh, bw, bh);
-      g.fillStyle = '#1C1F28'; g.font = `800 ${bh * .7}px system-ui,sans-serif`; g.textAlign = 'center'; g.fillText('TAXI', bx + bw / 2, yr - bh * .25);
-    }
-    // szárny
-    if (c.spoiler) {
-      const h = L * (.02 + c.spoiler * .012), sw = L * (.1 + c.spoiler * .02);
-      g.fillStyle = dark;
-      g.fillRect(X(.06), yt - h, L * .012, h); g.fillRect(X(.06) + sw * .6, yt - h, L * .012, h);
-      g.fillStyle = c.spoiler > 2 ? shade(c.color, .8) : dark;
-      g.beginPath(); g.moveTo(X(.02), yt - h); g.lineTo(X(.02) + sw, yt - h - L * .005); g.lineTo(X(.02) + sw, yt - h + L * .012); g.lineTo(X(.02), yt - h + L * .016); g.fill();
-    }
-  }
-  // kerekek
-  wx.forEach(cx => {
-    g.fillStyle = '#121419'; g.beginPath(); g.arc(cx, wy, r, 0, Math.PI * 2); g.fill();
-    if (silhouette) return;
-    const rg = g.createRadialGradient(cx - r * .2, wy - r * .2, 1, cx, wy, r * .68);
-    rg.addColorStop(0, '#F2F4F8'); rg.addColorStop(1, '#7E8594');
-    g.fillStyle = rg; g.beginPath(); g.arc(cx, wy, r * .64, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = '#3A3F4B'; g.lineWidth = Math.max(1, r * .12);
-    for (let k = 0; k < 5; k++) { const a = k * Math.PI * 2 / 5; g.beginPath(); g.moveTo(cx, wy); g.lineTo(cx + Math.cos(a) * r * .6, wy + Math.sin(a) * r * .6); g.stroke(); }
-    g.fillStyle = c.neon || '#2A2E38'; g.beginPath(); g.arc(cx, wy, r * .17, 0, Math.PI * 2); g.fill();
-  });
-  g.restore();
+// képek betöltése egyszer, a vászonra rajzoláshoz
+const imgCache = new Map();
+function carImage(c, onload) {
+  let im = imgCache.get(c.id);
+  if (!im) { im = new Image(); im.src = c.img; imgCache.set(c.id, im); }
+  if (!im.complete) im.addEventListener('load', onload, { once: true });
+  return im;
 }
 
 function hiCanvas(canvas, ratio) {
@@ -265,20 +161,6 @@ function hiCanvas(canvas, ratio) {
   canvas.width = w * dpr; canvas.height = h * dpr; canvas.style.height = h + 'px';
   const g = canvas.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
   return { g, w, h };
-}
-
-export function drawCarCard(canvas, c, locked) {
-  const { g, w, h } = hiCanvas(canvas, .5);
-  const bg = g.createLinearGradient(0, 0, 0, h);
-  bg.addColorStop(0, locked ? '#0F1117' : '#1A1F2C'); bg.addColorStop(1, '#0B0D12');
-  g.fillStyle = bg; g.fillRect(0, 0, w, h);
-  if (!locked) {
-    const sp = g.createRadialGradient(w / 2, h * .1, 2, w / 2, h * .5, w * .55);
-    sp.addColorStop(0, 'rgba(255,255,255,.16)'); sp.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = sp; g.fillRect(0, 0, w, h);
-  }
-  g.fillStyle = 'rgba(255,255,255,.05)'; g.fillRect(0, h * .8, w, h * .2);
-  drawCarV(g, w * .09, h * .8, w * .82, c, { silhouette: locked });
 }
 
 // Éjszakai versenypálya: az autó a rajttól a célig halad
@@ -322,13 +204,21 @@ function drawRace(canvas, prog) {
   g.fillStyle = 'rgba(255,255,255,.6)'; g.font = `700 ${Math.max(10, w * .026)}px system-ui,sans-serif`; g.textAlign = 'center';
   for (let k = 0; k <= 4; k++) g.fillText(`${Math.round(prog.size * k / 4)} km`, start + span * k / 4 + w * .06, h - h * .015);
   // autó és sebességcsíkok
-  const L = w * .2, f = Math.min(1, prog.placed / prog.size), cx = start + (span - L) * f;
+  const L = w * .24, f = Math.min(1, prog.placed / prog.size), cx = start + (span - L) * f;
   const carY = road + rh * .8;
   if (f > 0) {
     g.strokeStyle = 'rgba(0,229,255,.35)'; g.lineWidth = 2;
     for (let i = 0; i < 4; i++) { const yy = carY - L * .05 - i * L * .045; g.beginPath(); g.moveTo(Math.max(0, cx - L * (.3 + i * .08)), yy); g.lineTo(cx - 4, yy); g.stroke(); }
   }
-  drawCarV(g, cx, carY, L, activeCar());
+  const car = activeCar(), im = carImage(car, () => drawRace(canvas, prog));
+  if (im.complete && im.naturalWidth) {
+    const h2 = L * im.naturalHeight / im.naturalWidth;
+    g.save(); g.fillStyle = 'rgba(0,0,0,.45)'; g.beginPath(); g.ellipse(cx + L / 2, carY, L * .48, h2 * .08, 0, 0, Math.PI * 2); g.fill(); g.restore();
+    g.save();
+    if (car.face === 'L') { g.translate(cx + L, 0); g.scale(-1, 1); g.drawImage(im, 0, carY - h2 * .97, L, h2); }
+    else g.drawImage(im, cx, carY - h2 * .97, L, h2);
+    g.restore();
+  }
 }
 
 // Focis: a labda a kapu felé halad, a gólok golyóként gyűlnek

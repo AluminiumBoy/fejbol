@@ -1,5 +1,5 @@
 // Jutalombolt: érmék, a felnőttek által feltöltött jutalmak, pénzre váltás, PIN-nel védett beállítások.
-import { state, save } from './store.js?v=14';
+import { state, save } from './store.js?v=15';
 
 export function shop() {
   state.shop = Object.assign({ coins: 0, items: [], orders: [], rate: 0, minCash: 0, pin: '' }, state.shop || {});

@@ -1,11 +1,11 @@
-import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=14';
-import * as S from './store.js?v=14';
-import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=14';
-import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=14';
-import * as G from './game.js?v=14';
-import * as SH from './shop.js?v=14';
-import * as MM from './memes.js?v=14';
-import * as CD from './cards.js?v=14';
+import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=15';
+import * as S from './store.js?v=15';
+import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=15';
+import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=15';
+import * as G from './game.js?v=15';
+import * as SH from './shop.js?v=15';
+import * as MM from './memes.js?v=15';
+import * as CD from './cards.js?v=15';
 
 const app = document.getElementById('app');
 const I = {
@@ -176,7 +176,8 @@ VIEWS.card = ({ id }) => {
   app.innerHTML = `
     <div class="top"><button class="icon-btn" id="back" aria-label="Vissza">${I.back}</button><span class="grow"></span></div>
     <div class="showcase">${CD.cardHTML(c)}</div>
-    <p class="muted small" style="text-align:center;margin:0">Húzd rajta az ujjad, vagy döntsd meg a telefont.</p>`;
+    <p class="muted small" style="text-align:center;margin:0">Húzd rajta az ujjad, vagy döntsd meg a telefont.</p>
+    <p class="credit">Fotó: ${esc(c.by)} · <a href="${c.src}" target="_blank" rel="noopener">${c.lic}</a>, Wikimedia Commons (kivágva)</p>`;
   requestAnimationFrame(() => { CD.paintCards(app); cleanups.push(CD.tilt(app.querySelector('.tcard'))); });
   app.querySelector('#back').onclick = back;
 };
@@ -579,7 +580,7 @@ VIEWS.result = ({ id, task, score, raw, pass, rw, wholeDone, mastered }) => {
     ${rw?.levelUp ? `<div class="levelup"><span class="lvbadge px">${rw.levelUp.lvl}</span><div><b class="px">Új rang: ${rw.levelUp.name}</b><br><span>${rw.levelUp.lvl}. szint</span></div></div>` : ''}
     ${rw?.missionDone ? `<div class="levelup chestwin"><span class="chest open" aria-hidden="true"></span><div><b class="px">Napi küldetés kész</b><br><span>Láda: +30 XP</span></div></div>`
       : rw ? `<div class="note small">Napi küldetés: ${m.done}/${G.MISSION_SIZE}${m.claimed ? ' (kész)' : ''}</div>` : ''}
-    ${(rw?.newCars || []).map(c => `<div class="newcar"><p class="label">Új autó feloldva</p><canvas data-car="${c.id}"></canvas><b class="px">${esc(c.name)}</b><button class="btn primary px" data-drive="${c.id}">Beülök</button></div>`).join('')}
+    ${(rw?.newCars || []).map(c => `<div class="newcar"><p class="label">Új autó feloldva</p><div class="carstage"><img src="${c.img}" alt="${esc(c.name)}"></div><b class="px">${esc(c.name)}</b><button class="btn primary px" data-drive="${c.id}">Beülök</button></div>`).join('')}
     ${rw?.packs ? `<button class="packbanner" id="openpack"><span class="minipack" aria-hidden="true"></span><span class="grow"><b class="px">+${rw.packs} kártyacsomag</b><br><span class="small">Koppints és bontsd ki</span></span><span class="px">Bontás</span></button>` : ''}
     ${rw?.buildDone ? `<div class="levelup"><span class="lvbadge px">✓</span><div><b class="px">${esc(G.world().done(rw.buildDone))}</b><br><span>${G.world().next}</span></div></div>` : ''}
     ${(rw?.earned || []).map(b => `<div class="levelup"><span class="bico px" style="--bc:${b.color}">${b.glyph}</span><div><b class="px">Új jelvény: ${esc(b.name)}</b><br><span>${esc(b.desc)}</span></div></div>`).join('')}
@@ -592,7 +593,6 @@ VIEWS.result = ({ id, task, score, raw, pass, rw, wholeDone, mastered }) => {
   requestAnimationFrame(() => {
     const c = app.querySelector('#build');
     if (c) G.drawProgress(c, bp, Math.min(rw.blocks, bp.placed));
-    app.querySelectorAll('canvas[data-car]').forEach(cv => G.drawCarCard(cv, G.CARS.find(x => x.id === cv.dataset.car), false));
   });
   app.querySelectorAll('[data-drive]').forEach(b => b.onclick = () => { S.state.game.car = b.dataset.drive; S.save(); G.sfx('win'); toast('Kiválasztva'); b.disabled = true; });
   if (wholeDone || rw?.levelUp || rw?.missionDone || rw?.newCars?.length) { G.sfx(rw?.levelUp ? 'level' : 'win'); G.confetti(); }
@@ -763,14 +763,21 @@ VIEWS.garage = () => {
     <div class="garage">${G.CARS.map((c, i) => {
       const locked = i >= n;
       return `<button class="gcar ${c.id === cur.id ? 'sel' : ''}" data-id="${c.id}" ${locked ? 'disabled' : ''}>
-        <canvas data-car="${c.id}"></canvas>
+        <div class="carstage ${locked ? 'locked' : ''}"><img src="${c.img}" alt="${locked ? '' : esc(c.name)}" loading="lazy"></div>
         <b class="px">${locked ? '???' : esc(c.name)}</b>
-        <span>${locked ? `${i}. futam után` : c.id === cur.id ? 'Ezzel mész' : 'Kiválasztom'}</span>
+        <span>${locked ? `${i}. futam után` : c.id === cur.id ? 'Ezzel mész' : `${c.hp} LE · ${c.top} km/h`}</span>
       </button>`;
     }).join('')}</div>`;
-  requestAnimationFrame(() => app.querySelectorAll('canvas[data-car]').forEach((cv, i) => G.drawCarCard(cv, G.CARS[i], i >= n)));
   app.querySelector('#back').onclick = back;
   app.querySelectorAll('.gcar:not([disabled])').forEach(b => b.onclick = () => { S.state.game.car = b.dataset.id; S.save(); G.sfx('block'); VIEWS.garage(); });
+};
+
+VIEWS.credits = () => {
+  app.innerHTML = `
+    <div class="top"><button class="icon-btn" id="back" aria-label="Vissza">${I.back}</button><h1 class="t grow px">Fotók forrása</h1></div>
+    <p class="muted small" style="margin:0">Az autófotók a Wikimedia Commonsról származnak, szabad licenccel. A háttér ki lett vágva, a módosított képek ugyanazon licenc alatt használhatók. A kártyák adatai kerekített gyári adatok.</p>
+    <div class="slist">${CD.CARDS.map(c => `<div class="srow"><span class="first" style="font-family:var(--ui)"><b>${esc(c.name)}</b><br><span class="small muted">${esc(c.by)} · <a href="${c.src}" target="_blank" rel="noopener">${c.lic}</a></span></span></div>`).join('')}</div>`;
+  app.querySelector('#back').onclick = back;
 };
 
 VIEWS.settings = () => {
@@ -800,11 +807,14 @@ VIEWS.settings = () => {
     <div class="chips" id="voice">${Object.entries(voices).map(([k, l]) => `<button class="chip" data-v="${k}" aria-pressed="${cur === k}">${esc(l)}</button>`).join('')}</div>
     <button class="btn wide" id="try">Meghallgatom</button>
     <p class="muted small" style="margin:0">A beépített versekhez előre elkészített, természetes magyar felolvasás tartozik. Saját versnél a telefon saját felolvasója szól${canSpeak() ? '' : ', de ezen a készüléken nem találtam magyar hangot'}.</p>
+    <p class="label">Autófotók</p>
+    <button class="btn wide" id="credits">Fotók forrása és licence</button>
     <p class="label">Adatok</p>
     <p class="muted small" style="margin:0">A versek és a haladás csak ezen a telefonon, ebben a böngészőben tárolódnak. Nem kell hozzá fiók.</p>`;
   app.querySelector('#back').onclick = back;
   app.querySelectorAll('#size .chip').forEach(b => b.onclick = () => { S.setSize(+b.dataset.v); VIEWS.settings(); });
   app.querySelectorAll('#world .chip').forEach(b => b.onclick = () => { setWorld(b.dataset.v); VIEWS.settings(); });
+  app.querySelector('#credits').onclick = () => go('credits');
   app.querySelectorAll('#paper .chip').forEach(b => b.onclick = () => { set.paper = b.dataset.v === '1'; S.save(); document.documentElement.dataset.paper = set.paper ? '1' : '0'; VIEWS.settings(); });
   app.querySelectorAll('#memeOn .chip').forEach(b => b.onclick = () => { MM.setMemes(b.dataset.v === '1'); VIEWS.settings(); });
   const fillMemes = async () => {

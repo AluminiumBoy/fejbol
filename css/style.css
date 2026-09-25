@@ -569,3 +569,19 @@ body::before{content:"";position:fixed;inset:-10%;z-index:-1;pointer-events:none
 .sheet{background-color:#10141C}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .hero,.qbtn,.pcard,.rank,.icon-btn,.shopsec,.badge,.gcar,.levelup,.result,.tabs,.slist,.tile,.picker,.world,.guide,.memeset,.rankcard,.next,.lvl,.stat,.note,.chip,.opt,.lcard,.wchip,.item{background-color:#151923}}
+
+/* ===== valódi autófotók ===== */
+img.tc-img{width:100%;aspect-ratio:16/10;object-fit:contain;padding:4px 2px;background:radial-gradient(ellipse at 50% 70%,rgba(255,255,255,.16),rgba(255,255,255,0) 70%);
+  filter:drop-shadow(0 10px 12px rgba(0,0,0,.6));-webkit-user-drag:none;user-select:none}
+.tcard.sm img.tc-img{padding:2px 0}
+img.tc-img.sil{filter:brightness(0) opacity(.45);background:none}
+.tcard.locked .tc-in{justify-content:center}
+.tc-stats div{grid-template-columns:5.6rem 1fr auto}
+.tc-stats b{white-space:nowrap}
+.tc-credit{font-size:.6rem;opacity:.6;text-align:center}
+.credit{margin:0;text-align:center;font-size:.8rem;color:var(--faint)}
+.credit a,.srow a{color:inherit}
+.carstage{display:grid;place-items:center;aspect-ratio:16/9;border-radius:10px;background:radial-gradient(ellipse at 50% 30%,rgba(255,255,255,.14),rgba(255,255,255,0) 65%),linear-gradient(to bottom,#1A1F2C,#0E1117);overflow:hidden}
+.carstage img{width:92%;height:88%;object-fit:contain;filter:drop-shadow(0 12px 14px rgba(0,0,0,.65))}
+.carstage.locked img{filter:brightness(0) opacity(.45)}
+.newcar .carstage{width:min(100%,360px)}
