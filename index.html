@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2340A0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Fejből">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Fejből</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Nunito:wght@500;700;800&family=Caveat:wght@600&display=swap">
+<style>
+:root{
+  --bg:#EDF0F6; --paper:#FBFCFE; --ink:#1B2437; --muted:#5B6478;
+  --pen:#2340A0; --pen-soft:#E2E8F8; --margin:#D6453D; --rule:#D5DCEA;
+  --line:#CBD3E3; --good:#237A4B; --good-soft:#DDF1E5; --bad:#B8352E; --bad-soft:#F8E1DF;
+  --lh:2.3rem;
+  --ui:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --poem:"Literata",Georgia,"Times New Roman",serif;
+  --hand:"Caveat","Segoe Print","Comic Sans MS",cursive;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#10141D; --paper:#171C28; --ink:#E6E9F1; --muted:#98A1B6;
+    --pen:#93AAFF; --pen-soft:#243058; --margin:#E36A62; --rule:#262E40;
+    --line:#2F384C; --good:#62C58F; --good-soft:#1C3A2B; --bad:#F1827A; --bad-soft:#44221F;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#10141D; --paper:#171C28; --ink:#E6E9F1; --muted:#98A1B6;
+  --pen:#93AAFF; --pen-soft:#243058; --margin:#E36A62; --rule:#262E40;
+  --line:#2F384C; --good:#62C58F; --good-soft:#1C3A2B; --bad:#F1827A; --bad-soft:#44221F;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:16px;line-height:1.5}
+.wrap{max-width:760px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:flex;flex-direction:column;gap:16px}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--pen);outline-offset:2px;border-radius:6px}
+
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand h1{margin:0;font-family:var(--hand);font-size:2.4rem;line-height:1;color:var(--pen);font-weight:600}
+.brand span{color:var(--muted);font-size:.9rem}
+.picker{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+select{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:8px 10px;max-width:220px}
+.btn{border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:8px 14px;font-weight:700}
+.btn:hover{border-color:var(--pen)}
+.btn.primary{background:var(--pen);border-color:var(--pen);color:var(--paper)}
+.btn.good{background:var(--good);border-color:var(--good);color:var(--paper)}
+.btn.bad{background:var(--paper);border-color:var(--bad);color:var(--bad)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--pen)}
+
+.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:5px}
+.modes button{border:0;background:transparent;border-radius:10px;padding:9px 4px;font-weight:700;color:var(--muted);font-size:.95rem}
+.modes button[aria-selected="true"]{background:var(--pen-soft);color:var(--pen)}
+@media (max-width:480px){.modes button{font-size:.82rem}}
+
+.bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:4px 12px;font-size:.88rem;font-weight:700;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.hint{color:var(--muted);font-size:.92rem;margin:0}
+
+/* füzetlap */
+.sheet{position:relative;background-color:var(--paper);border:1px solid var(--line);border-radius:6px 14px 14px 6px;
+  box-shadow:0 1px 0 var(--line),0 10px 30px -18px rgba(20,30,60,.35);
+  padding:calc(var(--lh)*1) 20px calc(var(--lh)*1) 3.4rem;
+  background-image:repeating-linear-gradient(to bottom,transparent 0,transparent calc(var(--lh) - 1px),var(--rule) calc(var(--lh) - 1px),var(--rule) var(--lh));
+  background-position:0 calc(var(--lh)*1 - .35rem)}
+.sheet::before{content:"";position:absolute;top:0;bottom:0;left:2.4rem;width:2px;background:var(--margin);opacity:.55}
+@media (max-width:480px){.sheet{padding-left:2.4rem;padding-right:14px}.sheet::before{left:1.6rem}}
+.ptitle{font-family:var(--poem);font-weight:600;font-size:1.25rem;line-height:var(--lh);margin:0;text-wrap:balance}
+.pauthor{font-family:var(--poem);font-style:italic;color:var(--muted);line-height:var(--lh);margin:0 0 var(--lh)}
+.poem{font-family:var(--poem);font-size:1.12rem;line-height:var(--lh)}
+.stanza{margin:0 0 var(--lh)}
+.stanza:last-child{margin-bottom:0}
+.ln{display:block;position:relative}
+.snum{position:absolute;left:-2.9rem;width:2.1rem;text-align:right;font-family:var(--hand);font-size:1.15rem;color:var(--margin);opacity:.85}
+@media (max-width:480px){.snum{left:-2.3rem;width:1.6rem}}
+
+.w{border:0;background:none;padding:0;font:inherit;line-height:inherit;border-radius:3px;color:var(--ink)}
+.w.hid{color:transparent;background:var(--pen-soft);box-shadow:inset 0 -2px 0 var(--pen)}
+.w.hid:hover{background:color-mix(in srgb,var(--pen-soft) 70%,var(--pen) 30%)}
+.w.shown{color:var(--pen)}
+.w .fl{color:var(--pen);font-weight:600}
+.w.init{box-shadow:inset 0 -2px 0 var(--line)}
+.w.init .rest{color:transparent}
+.w.init.shown .rest{color:var(--pen)}
+
+.ln.todo{color:var(--muted);font-family:var(--ui);font-size:.98rem;font-style:normal}
+.ln.todo .ask{display:inline-block;border:2px dashed var(--line);border-radius:8px;padding:0 10px;line-height:calc(var(--lh) - .5rem);vertical-align:middle}
+.ln.miss::after{content:"";position:absolute;left:-1.05rem;top:50%;width:8px;height:8px;border-radius:50%;background:var(--bad);transform:translateY(-50%)}
+.ln.ok::after{content:"";position:absolute;left:-1.05rem;top:50%;width:8px;height:8px;border-radius:50%;background:var(--good);transform:translateY(-50%)}
+.ln.cur{background:var(--pen-soft);border-radius:4px;margin-left:-6px;padding-left:6px}
+
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.level{display:flex;align-items:center;gap:10px;flex:1;min-width:200px}
+.level input{flex:1;accent-color:var(--pen)}
+.level output{font-variant-numeric:tabular-nums;font-weight:800;color:var(--pen);min-width:3.2em;text-align:right}
+.score{font-family:var(--hand);font-size:1.6rem;color:var(--pen);line-height:1}
+.result{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:12px;background:var(--good-soft);color:var(--ink)}
+.result.meh{background:var(--bad-soft)}
+.result strong{font-family:var(--hand);font-size:1.8rem;font-weight:600;line-height:1.1}
+
+.editor{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.editor h2{margin:0;font-size:1.1rem}
+.editor label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:.9rem;color:var(--muted)}
+.editor input,.editor textarea{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--ink);font-weight:500}
+.editor textarea{min-height:260px;font-family:var(--poem);font-size:1rem;line-height:1.6;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:480px){.row2{grid-template-columns:1fr}}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--bad);font-weight:700}
+.sample{font-size:.85rem;color:var(--muted);text-align:center;margin:0}
+@media (prefers-reduced-motion:no-preference){.w,.chip,.modes button{transition:background .15s,color .15s}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="brand"><h1>Fejből</h1><span>verstanuló</span></div>
+    <div class="picker">
+      <select id="textSel" aria-label="Melyik szöveg"></select>
+      <button class="btn" id="editBtn">Szerkesztés</button>
+      <button class="btn primary" id="newBtn">+ Új vers</button>
+    </div>
+  </header>
+
+  <section class="editor" id="editor" hidden>
+    <h2 id="edTitle">Új vers</h2>
+    <div class="row2">
+      <label>Cím<input id="fTitle" placeholder="pl. Anyám tyúkja"></label>
+      <label>Szerző<input id="fAuthor" placeholder="pl. Petőfi Sándor"></label>
+    </div>
+    <label>A vers szövege (a versszakok között hagyj egy üres sort)
+      <textarea id="fText" placeholder="Másold ide a verset…"></textarea>
+    </label>
+    <div class="controls">
+      <button class="btn primary" id="saveBtn">Mentés</button>
+      <button class="btn" id="cancelBtn">Mégse</button>
+      <span style="flex:1"></span>
+      <button class="btn ghost" id="delBtn">Törlés</button>
+    </div>
+    <div class="confirm" id="delConfirm" hidden>
+      Biztosan törlöd?
+      <button class="btn bad" id="delYes">Igen, törlés</button>
+      <button class="btn" id="delNo">Mégse</button>
+    </div>
+  </section>
+
+  <nav class="modes" role="tablist" id="modes">
+    <button role="tab" data-mode="read">Olvasás</button>
+    <button role="tab" data-mode="hide">Eltüntetés</button>
+    <button role="tab" data-mode="init">Kezdőbetűk</button>
+    <button role="tab" data-mode="line">Soronként</button>
+  </nav>
+
+  <div class="bar">
+    <div class="chips" id="stanzaChips"></div>
+    <p class="hint" id="modeHint"></p>
+  </div>
+
+  <div class="controls" id="modeControls"></div>
+
+  <article class="sheet">
+    <h2 class="ptitle" id="pTitle"></h2>
+    <p class="pauthor" id="pAuthor"></p>
+    <div class="poem" id="poem"></div>
+  </article>
+
+  <div id="resultBox"></div>
+  <p class="sample" id="sampleNote" hidden>Ez egy minta. Az „+ Új vers” gombbal bemásolhatod a saját versedet. A szövegek ezen az eszközön maradnak.</p>
+</div>
+
+<script>
+(function(){
+  const KEY = 'fejbol.v2';
+  const SAMPLE = {
+    id:'ittvanazosz', kind:'vers',
+    title:'Itt van az ősz, itt van újra…', author:'Petőfi Sándor',
+    text:"Itt van az ősz, itt van ujra,\nS szép, mint mindig, énnekem.\nTudja isten, hogy mi okból\nSzeretem? de szeretem.\n\nKiülök a dombtetőre,\nInnen nézek szerteszét,\nS hallgatom a fák lehulló\nLevelének lágy neszét.\n\nMosolyogva néz a földre\nA szelíd nap sugara,\nMint elalvó gyermekére\nNéz a szerető anya.\n\nÉs valóban ősszel a föld\nCsak elalszik, nem hal meg;\nSzeméből is látszik, hogy csak\nÁlmos ő, de nem beteg.\n\nLevetette szép ruháit,\nCsendesen levetkezett;\nMajd felöltözik, ha virrad\nReggele, a kikelet.\n\nAludjál hát, szép természet,\nCsak aludjál reggelig,\nS álmodj olyakat, amikben\nLegnagyobb kedved telik.\n\nÉn ujjam hegyével halkan\nLantomat megpenditem,\nAltató dalod gyanánt zeng\nMéla csendes énekem. –\n\nKedvesem, te űlj le mellém,\nÜlj itt addig szótlanúl,\nMíg dalom, mint tó fölött a\nSuttogó szél, elvonúl.\n\nHa megcsókolsz, ajkaimra\nAjkadat szép lassan tedd,\nFöl ne keltsük álmából a\nSzendergő természetet."
+  };
+  const HINTS = {
+    read:'Olvasd el hangosan többször, figyelj a ritmusra.',
+    hide:'Mondd el fejből, a hiányzó szavakat is. Ha elakadsz, koppints a szóra.',
+    init:'Csak a kezdőbetűk látszanak. Koppints egy szóra, ha nem jut eszedbe.',
+    line:'Mondd el a következő sort, aztán nézd meg, jó volt-e.'
+  };
+
+  let store = load();
+  let ui = {mode:'read', stanza:-1, level:30, seed:1, line:{i:0, shown:false, marks:[]}};
+  const $ = id => document.getElementById(id);
+
+  function load(){
+    try{ const s = JSON.parse(localStorage.getItem(KEY)); if(s && Array.isArray(s.texts)) return s; }catch(e){}
+    return {texts:[SAMPLE], current:'ittvanazosz', mode:'read'};
+  }
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(store)); }catch(e){} }
+  function cur(){ return store.texts.find(t=>t.id===store.current) || store.texts[0]; }
+
+  function stanzas(t){
+    return t.text.replace(/\r/g,'').split(/\n\s*\n/).map(s=>s.split('\n').map(l=>l.trim()).filter(Boolean)).filter(s=>s.length);
+  }
+  function activeStanzas(t){
+    const all = stanzas(t);
+    return all.map((lines,i)=>({i,lines})).filter(s=>ui.stanza<0 || s.i===ui.stanza);
+  }
+  const WORD = /[\p{L}\p{N}]+(?:[-'’][\p{L}\p{N}]+)*/gu;
+  function tokens(line){
+    const out=[]; let last=0, m;
+    WORD.lastIndex=0;
+    while((m=WORD.exec(line))){ if(m.index>last) out.push({t:line.slice(last,m.index)}); out.push({w:m[0]}); last=m.index+m[0].length; }
+    if(last<line.length) out.push({t:line.slice(last)});
+    return out;
+  }
+  function esc(s){ return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  // stabil véletlen sorrend: a szint emelésével mindig újabb szavak tűnnek el, a régiek eltűnve maradnak
+  function rank(key){ let h=2166136261 ^ ui.seed; for(const c of key){ h^=c.charCodeAt(0); h=Math.imul(h,16777619); } h^=h>>>13; h=Math.imul(h,0x5bd1e995); return ((h>>>0)%10000)/10000; }
+
+  function renderPicker(){
+    const sel=$('textSel'); sel.innerHTML='';
+    store.texts.forEach(t=>{ const o=document.createElement('option'); o.value=t.id; o.textContent=t.title||'Névtelen'; sel.appendChild(o); });
+    sel.value=cur().id;
+  }
+  function renderChips(){
+    const n=stanzas(cur()).length, box=$('stanzaChips'); box.innerHTML='';
+    if(n<2){ ui.stanza=-1; return; }
+    const mk=(label,val)=>{ const b=document.createElement('button'); b.className='chip'; b.textContent=label; b.setAttribute('aria-pressed', ui.stanza===val); b.onclick=()=>{ui.stanza=val; resetLine(); render();}; box.appendChild(b); };
+    mk('Egész',-1);
+    for(let i=0;i<n;i++) mk((i+1)+'. vsz.',i);
+  }
+
+  function wordBtn(w, key, cls){
+    if(cls==='hid') return `<button class="w hid" data-k="${key}" aria-label="rejtett szó">${esc(w)}</button>`;
+    if(cls==='init') return `<button class="w init" data-k="${key}" aria-label="kezdőbetű: ${esc(w[0])}"><span class="fl">${esc(w[0])}</span><span class="rest">${esc(w.slice(1))}</span></button>`;
+    return esc(w);
+  }
+  function lineHTML(line, key, mode){
+    return tokens(line).map((tk,j)=>{
+      if(tk.t!==undefined) return esc(tk.t);
+      const k=key+'.'+j;
+      if(mode==='hide' && rank(k) < ui.level/100) return wordBtn(tk.w,k,'hid');
+      if(mode==='init') return wordBtn(tk.w,k,'init');
+      return esc(tk.w);
+    }).join('');
+  }
+
+  function renderPoem(){
+    const t=cur(), st=activeStanzas(t), multi=stanzas(t).length>1;
+    $('pTitle').textContent=t.title||'Névtelen';
+    $('pAuthor').textContent=t.author||'';
+    $('pAuthor').hidden=!t.author;
+    $('sampleNote').hidden=!t.sample;
+    let html='';
+    if(ui.mode==='line'){
+      const flat=[]; st.forEach(s=>s.lines.forEach((l,li)=>flat.push({s:s.i,li,l})));
+      let prev=-1, open=false;
+      flat.forEach((f,idx)=>{
+        if(f.s!==prev){ if(open) html+='</p>'; html+='<p class="stanza">'; open=true; prev=f.s; }
+        const num = (multi && f.li===0) ? `<span class="snum">${f.s+1}.</span>` : '';
+        const mark = ui.line.marks[idx];
+        if(idx<ui.line.i) html+=`<span class="ln ${mark?'ok':'miss'}">${num}${esc(f.l)}</span>`;
+        else if(idx===ui.line.i && ui.line.shown) html+=`<span class="ln cur">${num}${esc(f.l)}</span>`;
+        else if(idx===ui.line.i) html+=`<span class="ln todo">${num}<span class="ask">${ui.line.hint? esc(f.l.split(/\s+/)[0])+' …' : 'Mondd el fejből a következő sort'}</span></span>`;
+      });
+      if(open) html+='</p>';
+      ui.line.total=flat.length;
+    } else {
+      st.forEach(s=>{
+        html+='<p class="stanza">'+s.lines.map((l,li)=>`<span class="ln">${(multi&&li===0)?`<span class="snum">${s.i+1}.</span>`:''}${lineHTML(l,s.i+'.'+li,ui.mode)}</span>`).join('')+'</p>';
+      });
+    }
+    $('poem').innerHTML=html;
+  }
+
+  function renderControls(){
+    const c=$('modeControls'); c.innerHTML=''; $('resultBox').innerHTML='';
+    if(ui.mode==='hide'){
+      c.innerHTML=`<div class="level"><label for="lvl" style="font-weight:700">Eltüntetve</label><input type="range" id="lvl" min="0" max="100" step="10" value="${ui.level}"><output id="lvlOut">${ui.level}%</output></div>
+        <button class="btn primary" id="harder">Nehezebb</button><button class="btn" id="shuffle">Más szavak</button>`;
+      $('lvl').oninput=e=>{ui.level=+e.target.value; $('lvlOut').textContent=ui.level+'%'; renderPoem();};
+      $('harder').onclick=()=>{ui.level=Math.min(100,ui.level+20); renderControls(); renderPoem();};
+      $('shuffle').onclick=()=>{ui.seed++; renderPoem();};
+    } else if(ui.mode==='init'){
+      c.innerHTML=`<button class="btn" id="showAll">Mind mutat</button><button class="btn" id="hideAll">Mind elrejt</button>`;
+      $('showAll').onclick=()=>document.querySelectorAll('.w.init').forEach(b=>b.classList.add('shown'));
+      $('hideAll').onclick=()=>document.querySelectorAll('.w.init').forEach(b=>b.classList.remove('shown'));
+    } else if(ui.mode==='line'){
+      const L=ui.line, total=L.total||0;
+      if(L.i>=total && total){
+        const good=L.marks.filter(Boolean).length, all=good===total;
+        $('resultBox').innerHTML=`<div class="result ${all?'':'meh'}"><strong>${all?'Hibátlan! Mehet fejből.':good+' / '+total+' sor ment elsőre'}</strong>
+          <span>${all?'Holnap mondd el újra, hogy megmaradjon.':'A piros pöttyös sorokat gyakorold még, aztán próbáld újra.'}</span>
+          <div class="controls"><button class="btn primary" id="again">Újra</button></div></div>`;
+        $('again').onclick=()=>{resetLine(); render();};
+        c.innerHTML=`<span class="score">${good}/${total}</span>`;
+        return;
+      }
+      c.innerHTML = L.shown
+        ? `<button class="btn good" id="ok">Tudtam ✓</button><button class="btn bad" id="no">Nem ment ✗</button><span style="flex:1"></span><span class="score">${L.i+1}/${total}</span>`
+        : `<button class="btn primary" id="reveal">Mutasd</button><button class="btn" id="hint" ${L.hint?'disabled':''}>Súgás: első szó</button><span style="flex:1"></span><span class="score">${L.i+1}/${total}</span>`;
+      if(L.shown){
+        $('ok').onclick=()=>step(true); $('no').onclick=()=>step(false);
+      } else {
+        $('reveal').onclick=()=>{L.shown=true; render();};
+        $('hint').onclick=()=>{L.hint=true; render();};
+      }
+    }
+  }
+  function step(ok){ const L=ui.line; L.marks[L.i]=ok && !L.hint; L.i++; L.shown=false; L.hint=false; render(); }
+  function resetLine(){ ui.line={i:0,shown:false,hint:false,marks:[]}; }
+
+  function render(){
+    document.querySelectorAll('#modes button').forEach(b=>b.setAttribute('aria-selected', b.dataset.mode===ui.mode));
+    $('modeHint').textContent=HINTS[ui.mode];
+    renderChips(); renderPoem(); renderControls();
+  }
+
+  $('poem').addEventListener('click',e=>{
+    const b=e.target.closest('.w'); if(!b) return;
+    if(b.classList.contains('hid')){ b.classList.remove('hid'); b.classList.add('shown'); }
+    else if(b.classList.contains('init')) b.classList.toggle('shown');
+  });
+  $('modes').addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b) return;
+    ui.mode=b.dataset.mode; store.mode=ui.mode; save(); resetLine(); render();
+  });
+  $('textSel').onchange=e=>{ store.current=e.target.value; save(); ui.stanza=-1; resetLine(); closeEditor(); render(); };
+
+  let editing=null;
+  function openEditor(t){
+    editing=t; $('editor').hidden=false; $('delConfirm').hidden=true;
+    $('edTitle').textContent=t?'Szerkesztés':'Új vers';
+    $('fTitle').value=t?t.title:''; $('fAuthor').value=t?t.author:''; $('fText').value=t?t.text:'';
+    $('delBtn').hidden=!t;
+    $('fTitle').focus();
+  }
+  function closeEditor(){ $('editor').hidden=true; editing=null; }
+  $('newBtn').onclick=()=>openEditor(null);
+  $('editBtn').onclick=()=>openEditor(cur());
+  $('cancelBtn').onclick=closeEditor;
+  $('saveBtn').onclick=()=>{
+    const text=$('fText').value.trim();
+    if(!text){ $('fText').focus(); $('fText').placeholder='Előbb másold ide a vers szövegét.'; return; }
+    const data={title:$('fTitle').value.trim()||'Névtelen vers', author:$('fAuthor').value.trim(), text, kind:'vers'};
+    if(editing){ Object.assign(editing,data); delete editing.sample; }
+    else { const t={id:'t'+Date.now(),...data}; store.texts.push(t); store.current=t.id; }
+    save(); closeEditor(); ui.stanza=-1; resetLine(); renderPicker(); render();
+  };
+  $('delBtn').onclick=()=>{$('delConfirm').hidden=false;};
+  $('delNo').onclick=()=>{$('delConfirm').hidden=true;};
+  $('delYes').onclick=()=>{
+    store.texts=store.texts.filter(t=>t!==editing);
+    if(!store.texts.length) store.texts=[SAMPLE];
+    store.current=store.texts[0].id; save(); closeEditor(); ui.stanza=-1; resetLine(); renderPicker(); render();
+  };
+
+  ui.mode=store.mode||'read';
+  renderPicker(); render();
+})();
+</script>
+</body>
+</html>
