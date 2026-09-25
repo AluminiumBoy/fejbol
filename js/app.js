@@ -4,6 +4,7 @@ import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanza
 import { searchPoems, fetchPoem, ocrImage } from './sources.js';
 import * as G from './game.js';
 import * as SH from './shop.js';
+import * as MM from './memes.js';
 
 const app = document.getElementById('app');
 const I = {
@@ -329,10 +330,11 @@ function setWorld(k) {
 // kombó: egymás utáni jó válaszok; 3-tól felvillan
 let streakRun = 0;
 function combo(kind) {
-  if (kind === 'bad') { streakRun = 0; return; }
+  if (kind === 'bad') { streakRun = 0; MM.popMeme('bad'); return; }
   if (kind !== 'good' && kind !== 'block') return;
   streakRun++;
   if (streakRun < 3) return;
+  if (streakRun === 3 || streakRun % 5 === 0) MM.popMeme('good');
   document.querySelector('.hype')?.remove();
   const t = document.createElement('div');
   t.className = 'hype good'; t.textContent = `Kombó ×${streakRun}`;
@@ -453,6 +455,7 @@ VIEWS.result = ({ id, task, score, raw, pass, rw, wholeDone, mastered }) => {
   app.innerHTML = `
     <div class="result ${wholeDone ? 'grand' : ''}">
       <div class="stars">${[0, 1, 2].map(i => I.star.replace('<svg', `<svg class="${i < stars ? 'on' : 'off'}" style="animation-delay:${i * .15}s"`)).join('')}</div>
+      <img class="memebig" id="meme" alt="" hidden>
       <h2>${head}</h2>
       <p>${blitz ? '' : `<b>${Math.round(score * 100)}%</b> · `}${msg}</p>
       ${rw ? `<div class="loot">
@@ -481,6 +484,8 @@ VIEWS.result = ({ id, task, score, raw, pass, rw, wholeDone, mastered }) => {
   app.querySelectorAll('[data-drive]').forEach(b => b.onclick = () => { S.state.game.car = b.dataset.drive; S.save(); G.sfx('win'); toast('Kiválasztva'); b.disabled = true; });
   if (wholeDone || rw?.levelUp || rw?.missionDone || rw?.newCars?.length) { G.sfx(rw?.levelUp ? 'level' : 'win'); G.confetti(); }
   else if (stars >= 2) G.sfx('win');
+  const memeKind = stars >= 3 || wholeDone || (blitz && raw >= (poem.best || 0) && raw > 0) ? 'good' : stars <= 1 ? 'bad' : null;
+  if (memeKind && MM.memesOn()) MM.pick(memeKind).then(src => { const im = app.querySelector('#meme'); if (im) { im.src = src; im.hidden = false; } });
   app.querySelector('#next')?.addEventListener('click', () => go('exercise', { id, task: next }, false));
   app.querySelector('#again').onclick = () => go('exercise', { id, task }, false);
   app.querySelector('#done').onclick = () => go('poem', { id }, false);
@@ -666,6 +671,12 @@ VIEWS.settings = () => {
     <div class="chips" id="size">${['Normál', 'Nagy', 'Óriás'].map((l, i) => `<button class="chip" data-v="${i}" aria-pressed="${(set.size || 0) === i}">${l}</button>`).join('')}</div>
     <p class="label">Világ</p>
     <div class="chips" id="world">${Object.entries(G.WORLDS).map(([k, w]) => `<button class="chip" data-v="${k}" aria-pressed="${(set.world || 'build') === k}">${w.name}</button>`).join('')}</div>
+    <p class="label">Mém reakciók</p>
+    <div class="chips" id="memeOn"><button class="chip" data-v="1" aria-pressed="${MM.memesOn()}">Be</button><button class="chip" data-v="0" aria-pressed="${!MM.memesOn()}">Ki</button></div>
+    ${MM.memesOn() ? `<p class="muted small" style="margin:0">Saját mémeket is feltölthetsz. Csak ezen a telefonon tárolódnak. Ha nincs feltöltve semmi, a beépített cicák jönnek.</p>
+    ${[['good', 'Ha jól megy'], ['bad', 'Ha rosszul megy']].map(([k, l]) => `<div class="memeset"><b>${l}</b>
+      <div class="memegrid" id="mg-${k}"></div>
+      <label class="btn small" for="mf-${k}">+ Kép hozzáadása</label><input type="file" id="mf-${k}" accept="image/*" multiple hidden></div>`).join('')}` : ''}
     <p class="label">Hangeffektek</p>
     <div class="chips" id="sound"><button class="chip" data-v="1" aria-pressed="${set.sound !== false}">Be</button><button class="chip" data-v="0" aria-pressed="${set.sound === false}">Ki</button></div>
     <p class="label">Felolvasó hang</p>
@@ -677,6 +688,27 @@ VIEWS.settings = () => {
   app.querySelector('#back').onclick = back;
   app.querySelectorAll('#size .chip').forEach(b => b.onclick = () => { S.setSize(+b.dataset.v); VIEWS.settings(); });
   app.querySelectorAll('#world .chip').forEach(b => b.onclick = () => { setWorld(b.dataset.v); VIEWS.settings(); });
+  app.querySelectorAll('#memeOn .chip').forEach(b => b.onclick = () => { MM.setMemes(b.dataset.v === '1'); VIEWS.settings(); });
+  const fillMemes = async () => {
+    const all = await MM.listMemes();
+    for (const k of ['good', 'bad']) {
+      const box = app.querySelector('#mg-' + k); if (!box) continue;
+      const mine = all.filter(m => m.kind === k);
+      box.innerHTML = mine.length ? '' : '<span class="small muted">Még nincs saját kép.</span>';
+      mine.forEach(m => {
+        const w = document.createElement('div'); w.className = 'mthumb';
+        const im = document.createElement('img'); im.src = URL.createObjectURL(m.blob); im.alt = '';
+        const x = document.createElement('button'); x.textContent = '×'; x.setAttribute('aria-label', 'Törlés');
+        x.onclick = async () => { await MM.removeMeme(m.id); fillMemes(); };
+        w.append(im, x); box.appendChild(w);
+      });
+    }
+  };
+  fillMemes();
+  ['good', 'bad'].forEach(k => app.querySelector('#mf-' + k)?.addEventListener('change', async e => {
+    for (const f of e.target.files) { try { await MM.addMeme(k, f); } catch (err) { toast('Ezt a képet nem sikerült betölteni.'); } }
+    e.target.value = ''; fillMemes(); toast('Hozzáadva');
+  }));
   app.querySelectorAll('#sound .chip').forEach(b => b.onclick = () => { set.sound = b.dataset.v === '1'; S.save(); G.sfx('good'); VIEWS.settings(); });
   app.querySelectorAll('#voice .chip').forEach(b => b.onclick = () => { set.voice = b.dataset.v; S.save(); VIEWS.settings(); });
   let a = null;

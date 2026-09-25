@@ -420,3 +420,19 @@ body{background:var(--bg);background-image:radial-gradient(1200px 500px at 110% 
 .loot .coin{background:#2A2110 !important;color:var(--gold) !important}
 .shopsec .field input{background:var(--bg)}
 .shopsec form.two .btn{align-self:end}
+
+/* ===== mém reakciók ===== */
+.memebig{width:min(220px,60%);aspect-ratio:1;object-fit:cover;border-radius:18px;box-shadow:0 12px 30px -12px rgba(0,0,0,.8)}
+@media (prefers-reduced-motion:no-preference){.memebig{animation:pop .45s both}}
+.memepop{position:fixed;right:16px;bottom:calc(120px + env(safe-area-inset-bottom,0px));width:120px;height:120px;object-fit:cover;border-radius:16px;z-index:45;pointer-events:none;
+  box-shadow:0 12px 30px -8px rgba(0,0,0,.9);border:3px solid var(--line)}
+.memepop.good{border-color:var(--grass)}
+.memepop.bad{border-color:var(--bad)}
+@media (prefers-reduced-motion:no-preference){.memepop{animation:mpop 1.6s ease both}
+  @keyframes mpop{0%{transform:translateY(30px) scale(.6) rotate(-8deg);opacity:0}12%{transform:none;opacity:1}85%{opacity:1}100%{transform:translateY(10px) scale(.9);opacity:0}}}
+.memeset{display:flex;flex-direction:column;gap:8px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:12px}
+.memegrid{display:flex;flex-wrap:wrap;gap:8px}
+.mthumb{position:relative;width:72px;height:72px}
+.mthumb img{width:100%;height:100%;object-fit:cover;border-radius:10px}
+.mthumb button{position:absolute;top:-6px;right:-6px;width:26px;height:26px;border-radius:50%;border:0;background:var(--bad);color:#fff;font-weight:800;line-height:1}
+.memeset .btn{align-self:flex-start}
