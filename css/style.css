@@ -623,3 +623,11 @@ img.tc-img.sil{filter:brightness(0) opacity(.45);background:none}
 .petdock .btn.go.on{background:#FF4D7A;box-shadow:0 0 30px -6px #FF4D7A}
 .petdock .row .btn{min-height:54px;flex:1;display:flex;gap:6px}
 .petdock .row .btn{white-space:nowrap;font-size:.95rem;padding-inline:8px;align-items:center}
+
+/* ===== tanulótárs róka a feladatoknál ===== */
+.extitle.withpet{position:relative;padding-right:120px;min-height:112px}
+.minipet{position:absolute;right:-6px;top:-10px;width:124px;height:124px;border-radius:20px;overflow:hidden;
+  box-shadow:0 0 0 1px var(--glass-brd),0 12px 26px -14px rgba(0,0,0,.8);touch-action:manipulation}
+.pbubble.mini{left:auto;right:118px;top:6px;transform:none;font-size:.88rem;padding:6px 10px;max-width:60%}
+.pbubble.mini::after{left:auto;right:-7px;bottom:auto;top:50%;margin:-7px 0 0 0;border:7px solid transparent;border-left-color:#fff;border-right:0}
+.pbubble.mini.off{transform:translateX(6px)}

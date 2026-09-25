@@ -2,7 +2,7 @@
 //   ui  = { body, dock, progress(0..1), finish(score), cleanup(fn), toast(msg) }
 //   set = [{ i: versszak sorszáma, lines: [...] }]
 //   ctx = { allWords: a vers összes szava (tippekhez) }
-import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=19';
+import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=20';
 
 export const EXERCISES = {
   listen:   { name: 'Meghallgatás', short: 'Hallgasd meg és olvasd fel', help: 'Hallgasd meg, aztán olvasd fel hangosan te is.', icon: 'M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4' },
@@ -98,6 +98,7 @@ function listen(ui, set, ctx) {
   const playClip = (n, offset) => new Promise(res => {
     const { url, starts } = clips[n];
     const el = audio = makeAudio(url);
+    ui.pet?.attach(el);
     el.ontimeupdate = () => {
       if (el !== audio) return;
       let li = 0;
@@ -411,7 +412,7 @@ function initials(ui, set) {
 }
 
 // ================= 7. Felmondás =================
-function recall(ui, set) {
+function recall(ui, set, ctx) {
   const lines = flat(set);
   let k = 0, shown = false, hint = false, marks = [], heard = null, rec = null, micOff = !canListen();
   const draw = () => {
@@ -436,13 +437,13 @@ function recall(ui, set) {
   const dockDraw = () => {
     if (!shown) {
       ui.dock.innerHTML = `
-        ${micOff ? '' : `<button class="btn big primary wide mic" id="mic">Mondom</button>`}
+        ${micOff ? '' : `<button class="btn big primary wide mic" id="mic">${ui.pet ? `Mondd el ${esc(ui.pet.name)}nak` : 'Mondom'}</button>`}
         <div class="row">
           <button class="btn big grow" id="hint" ${hint ? 'disabled' : ''}>Súgás</button>
           <button class="btn big ${micOff ? 'primary' : ''} grow" id="show">Megnézem</button>
         </div>`;
       ui.dock.querySelector('#hint').onclick = () => { hint = true; draw(); dockDraw(); };
-      ui.dock.querySelector('#show').onclick = () => { shown = true; draw(); dockDraw(); };
+      ui.dock.querySelector('#show').onclick = () => { shown = true; draw(); dockDraw(); readLine(k); };
       if (!micOff) ui.dock.querySelector('#mic').onclick = listenLine;
     } else {
       const good = heard ? heard.ratio >= 0.75 : null;
@@ -458,7 +459,20 @@ function recall(ui, set) {
       if (heard && !good) ui.dock.querySelector('#ok').textContent = 'Mégis tudtam';
     }
   };
+  // a sor felolvasása a versszak hangfájljából (a sorkezdési időpontok alapján), a róka szájával
+  function readLine(idx) {
+    if (!ui.pet) return;
+    const x = lines[idx], st = set.find(s => s.i === x.si), clip = st && stanzaAudio(st.lines, ctx.voice);
+    if (!clip) return;
+    const from = clip.starts[x.li] ?? 0, to = clip.starts[x.li + 1];
+    const el = makeAudio(clip.url);
+    ui.pet.attach(el);
+    el.addEventListener('loadedmetadata', () => { el.currentTime = Math.max(0, from - .05); el.play().catch(() => {}); }, { once: true });
+    if (to) el.addEventListener('timeupdate', () => { if (el.currentTime >= to - .05) el.pause(); });
+    ui.cleanup(() => el.pause());
+  }
   function step(ok) {
+    if (!heard) ui.pet?.react(ok ? 'good' : 'bad');
     marks[k] = ok && !hint; k++; shown = false; hint = false; heard = null;
     ui.progress(k / lines.length);
     if (k >= lines.length) return ui.finish(marks.filter(Boolean).length / lines.length);
@@ -478,14 +492,15 @@ function recall(ui, set) {
         if (!best || m.ratio > best.ratio) best = { ...m, text: alt.transcript };
       }
       heard = best; shown = true;
+      if (ui.pet) { const ok = best.ratio >= 0.75; ui.pet.react(ok ? 'great' : 'bad'); ui.pet.say(ok ? 'yes' : 'tryagain', ok ? 'Igen, ez az!' : 'Majdnem! Próbáld újra!'); }
     };
     rec.onerror = e => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { micOff = true; ui.toast('A mikrofon nincs engedélyezve. Használd a Megnézem gombot.'); }
       else if (e.error === 'no-speech') ui.toast('Nem hallottam semmit. Próbáld újra!');
       else if (e.error !== 'aborted') ui.toast('A hangfelismerés most nem működik.');
     };
-    rec.onend = () => { rec = null; if (got) draw(); dockDraw(); };
-    try { rec.start(); btn.classList.add('live'); btn.textContent = 'Figyelek… (koppints, ha kész)'; }
+    rec.onend = () => { rec = null; ui.pet?.listen(false); if (got) draw(); dockDraw(); };
+    try { rec.start(); ui.pet?.listen(true); btn.classList.add('live'); btn.textContent = ui.pet ? `${ui.pet.name} figyel… (koppints, ha kész)` : 'Figyelek… (koppints, ha kész)'; }
     catch (e) { rec = null; micOff = true; dockDraw(); }
   }
   ui.cleanup(() => { try { rec?.abort(); } catch (e) {} });

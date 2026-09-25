@@ -1,12 +1,12 @@
-import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=19';
-import * as S from './store.js?v=19';
-import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=19';
-import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=19';
-import * as G from './game.js?v=19';
-import * as SH from './shop.js?v=19';
-import * as MM from './memes.js?v=19';
-import * as CD from './cards.js?v=19';
-import * as P from './pet.js?v=19';
+import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=20';
+import * as S from './store.js?v=20';
+import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=20';
+import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=20';
+import * as G from './game.js?v=20';
+import * as SH from './shop.js?v=20';
+import * as MM from './memes.js?v=20';
+import * as CD from './cards.js?v=20';
+import * as P from './pet.js?v=20';
 
 const app = document.getElementById('app');
 const I = {
@@ -445,7 +445,7 @@ function petHeroHTML(bp) {
 }
 let petApi = null, petVoices = new Map(), bubbleTimer;
 async function loadPet(canvas, frame) {
-  const mod = await import('./pet3d.js?v=19');
+  const mod = await import('./pet3d.js?v=20');
   const p = P.pet();
   const seen = Math.min(p.seen ?? petStage(), petStage());
   const api = await mod.mountPet(canvas, { frame, gender: p.g || 'm', stage: seen, hungry: P.hungry(), onTap: () => petTap() });
@@ -455,9 +455,11 @@ async function loadPet(canvas, frame) {
   return api;
 }
 function petSay(txt, key, ms = 2600) {
-  const b = document.getElementById('pbubble'); if (!b) return;
-  b.textContent = txt; b.classList.remove('off');
-  clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => b.classList.add('off'), ms);
+  const b = document.getElementById('pbubble');
+  if (b && txt) {
+    b.textContent = txt; b.classList.remove('off');
+    clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => b.classList.add('off'), ms);
+  }
   if (!key || !petApi) return;
   const g = P.pet().g || 'm', k = g + '/' + key;
   if (!petVoices.has(k)) petVoices.set(k, fetch(`voice/${g}/${key}.mp3`).then(r => r.arrayBuffer()).then(a => petApi.audio().decodeAudioData(a)));
@@ -683,15 +685,27 @@ VIEWS.exercise = ({ id, task }) => {
   const stz = parseStanzas(poem.text);
   const set = task.stanzas.filter(i => stz[i]).map(i => ({ i, lines: stz[i] }));
   const ex = EXERCISES[task.type];
+  const withPet = S.state.settings.world === 'pet' && !!P.pet().g;
   app.innerHTML = `
     <div class="exbar">
       <button class="icon-btn" id="close" aria-label="Kilépés">${I.close}</button>
       <div class="progress" role="progressbar" aria-label="Haladás"><i style="width:0"></i></div>
     </div>
-    <div class="extitle"><h2>${ex.name}</h2><p>${esc(stanzaLabel(task.stanzas, stz.length))} · ${esc(poem.title)}</p></div>
+    <div class="extitle ${withPet ? 'withpet' : ''}"><h2>${ex.name}</h2><p>${esc(stanzaLabel(task.stanzas, stz.length))} · ${esc(poem.title)}</p>
+      ${withPet ? '<canvas id="petcv" class="minipet" aria-label="A kisállatod figyel"></canvas><div class="pbubble mini off" id="pbubble"></div>' : ''}</div>
     <div id="exbody"></div>
     <div class="dock" id="exdock"></div>`;
   app.querySelector('#close').onclick = back;
+  // a róka tanulótárs: felolvas, figyel, reagál
+  const pal = withPet ? {
+    name: P.petName(),
+    attach: el => petApi?.attach(el),
+    react: k => petApi?.react(k),
+    listen: on => petApi?.setListening(on),
+    say: (key, txt = '') => petSay(txt, key, 1800)
+  } : null;
+  if (withPet) loadPet(app.querySelector('#petcv'), 'mini').catch(() => app.querySelector('#petcv')?.remove());
+  let badSaid = 0;
   const bar = app.querySelector('.progress i');
   let finished = false;
   streakRun = 0;
@@ -700,7 +714,14 @@ VIEWS.exercise = ({ id, task }) => {
     progress: f => { bar.style.width = Math.round(f * 100) + '%'; },
     cleanup: f => cleanups.push(f),
     toast,
-    sfx: kind => { G.sfx(kind); combo(kind); },
+    sfx: kind => {
+      G.sfx(kind); combo(kind);
+      if (!pal) return;
+      pal.react(kind);
+      if (kind === 'bad' && Date.now() - badSaid > 8000) { badSaid = Date.now(); pal.say('oops', 'Hoppá, semmi baj!'); }
+      if (kind === 'good' && streakRun === 3) pal.say('combo', 'Hű, egymás után mind jó!');
+    },
+    pet: pal,
     finish: (score, raw) => {
       if (finished) return; finished = true;
       const r = S.applyResult(poem, task, score);
@@ -712,7 +733,9 @@ VIEWS.exercise = ({ id, task }) => {
       go('result', { id, task, score, raw, pass: r.pass, rw, wholeDone: r.wholeDone, mastered: r.mastered }, false);
     }
   };
-  run(task.type, ui, set, ctxFor(poem));
+  const ctx = ctxFor(poem);
+  if (withPet) ctx.voice = P.pet().g === 'f' ? 'noemi' : 'tamas';
+  run(task.type, ui, set, ctx);
 };
 
 VIEWS.result = ({ id, task, score, raw, pass, rw, wholeDone, mastered }) => {

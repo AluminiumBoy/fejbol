@@ -86,6 +86,7 @@ export async function mountPet(canvas, opts = {}) {
     renderer.setSize(w, h, false); composer.setSize(w, h);
     camera.aspect = w / h;
     if (frame === 'card') { camera.fov = 30; camera.position.set(0, 1.35, 4.6); camera.lookAt(0, .95, 0); }
+    else if (frame === 'mini') { camera.fov = 30; camera.position.set(0, 1.25, 3.3); camera.lookAt(0, 1.02, 0); }
     else { const p = w < h; camera.fov = p ? 40 : 30; camera.position.set(0, p ? 1.55 : 1.45, p ? 5.0 : 4.4); camera.lookAt(0, 1.0, 0); }
     camera.updateProjectionMatrix();
   }
@@ -225,7 +226,7 @@ export async function mountPet(canvas, opts = {}) {
   // ---------- állapot ----------
   const S = { gender: 'm', stage: 0, grow: STAGE_SCALE[0], growTo: STAGE_SCALE[0], asleep: false, sad: 0, sadTo: 0,
     happyT: 0, surpriseT: 0, jumpT: -1, eatT: -1, yawnT: -1, talk: 0, blinkT: 2, blink: 0, earT: 1.5,
-    look: new THREE.Vector2(), lookTo: new THREE.Vector2(), lastPointer: 0, idleT: 6, busy: false };
+    look: new THREE.Vector2(), lookTo: new THREE.Vector2(), lastPointer: 0, idleT: 6, busy: false, listen: 0, listenTo: 0, sadFlash: 0 };
   let food = null, onEaten = null, speakAn = null, voiceSrc = null, ac = null;
 
   function setGender(g) {
@@ -262,6 +263,20 @@ export async function mountPet(canvas, opts = {}) {
     speakAn = an; voiceSrc = src; src.start();
     return new Promise(res => src.onended = () => { if (voiceSrc === src) { speakAn = null; voiceSrc = null; } res(); });
   }
+  // bármilyen lejátszott hang (pl. a versfelolvasás) mozgassa a szájat
+  function attach(el) {
+    const a = audio();
+    try { const src = a.createMediaElementSource(el); const an = a.createAnalyser(); an.fftSize = 1024; src.connect(an); an.connect(a.destination); speakAn = an;
+      el.addEventListener('ended', () => { if (speakAn === an) speakAn = null; }); el.addEventListener('pause', () => { if (speakAn === an) speakAn = null; }); } catch (e) {}
+  }
+  // reakció egy válaszra
+  function react(kind) {
+    if (S.asleep) return;
+    if (kind === 'good') { happy(.9); if (Math.random() < .35) jump(); }
+    else if (kind === 'bad') { S.sadFlash = 1.2; S.surpriseT = .5; }
+    else if (kind === 'great') { happy(1.6); jump(); hearts(4); sparkle(12); }
+  }
+  const setListening = on => { S.listenTo = on ? 1 : 0; };
   const tbuf = new Float32Array(1024);
   const level = an => { an.getFloatTimeDomainData(tbuf); let s = 0; for (const v of tbuf) s += v * v; return Math.sqrt(s / tbuf.length); };
 
@@ -277,7 +292,9 @@ export async function mountPet(canvas, opts = {}) {
     if (!alive) return;
     const dt = Math.min(.05, clock.getDelta()), t = clock.elapsedTime, now = performance.now();
     S.grow += (S.growTo - S.grow) * Math.min(1, dt * 3);
-    S.sad += (S.sadTo - S.sad) * Math.min(1, dt * 2);
+    S.sadFlash = Math.max(0, S.sadFlash - dt);
+    S.sad += (Math.max(S.sadTo, S.sadFlash > 0 ? .8 : 0) - S.sad) * Math.min(1, dt * (S.sadFlash > 0 ? 6 : 2));
+    S.listen += (S.listenTo - S.listen) * Math.min(1, dt * 5);
     // magától is csinál dolgokat: körülnéz, ásít, csóvál
     S.idleT -= dt;
     if (S.idleT <= 0 && !S.asleep) {
@@ -311,7 +328,7 @@ export async function mountPet(canvas, opts = {}) {
     if (!S.asleep) S.look.lerp(S.lookTo, Math.min(1, dt * 4)); else S.look.lerp(new THREE.Vector2(0, -.6), dt * 2);
     headG.rotation.y = S.look.x * .35;
     headG.rotation.x = -S.look.y * .18 + (S.asleep ? .35 : 0) + S.sad * .18 + Math.sin(t * 1.3) * .02 + S.talk * .05 - yawn * .15;
-    headG.rotation.z = Math.sin(t * .9) * .04 + (S.asleep ? .15 : 0) + S.sad * .08;
+    headG.rotation.z = Math.sin(t * .9) * .04 + (S.asleep ? .15 : 0) + S.sad * .08 + S.listen * .22;
     headG.position.y = 1.2 + breath * 2 - S.sad * .03;
     // szemek, pislogás, szemöldök
     S.blinkT -= dt; if (S.blinkT <= 0) { S.blink = .16; S.blinkT = 2 + Math.random() * 3.5; }
@@ -333,7 +350,7 @@ export async function mountPet(canvas, opts = {}) {
     // fülek, farok, mancsok
     S.earT -= dt; let twitch = 0; if (S.earT <= 0) S.earT = 2 + Math.random() * 4; if (S.earT < .25) twitch = Math.sin(S.earT / .25 * Math.PI) * .35;
     ears.forEach((g, i) => { const s = i ? 1 : -1; const droop = (S.asleep ? .25 : 0) + S.sad * .55;
-      g.rotation.z = s * -.38 + (i ? twitch : 0) * s - s * droop; g.rotation.x = -.12 + (S.asleep ? .3 : 0) + S.sad * .35 - yawn * .2; });
+      g.rotation.z = s * -.38 + (i ? twitch : 0) * s - s * droop + s * S.listen * .15; g.rotation.x = -.12 + (S.asleep ? .3 : 0) + S.sad * .35 - yawn * .2 - S.listen * .25; });
     const wag = S.happyT > 0 ? 9 : S.sad > .5 ? 1 : 2.2;
     tailG.rotation.y = Math.sin(t * wag) * (S.happyT > 0 ? .5 : .25 - S.sad * .15);
     tailG.rotation.z = Math.sin(t * 1.7) * .08;
@@ -364,7 +381,7 @@ export async function mountPet(canvas, opts = {}) {
   raf = requestAnimationFrame(tick);
 
   return {
-    setGender, setStage, setMood, setSleep, poke, eat, speak, audio, jump, happy, hearts, sparkle,
+    setGender, setStage, setMood, setSleep, poke, eat, speak, audio, jump, happy, hearts, sparkle, attach, react, setListening,
     isAsleep: () => S.asleep,
     dispose() {
       alive = false; cancelAnimationFrame(raf); io.disconnect(); ro.disconnect();
