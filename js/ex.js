@@ -2,7 +2,8 @@
 //   ui  = { body, dock, progress(0..1), finish(score), cleanup(fn), toast(msg) }
 //   set = [{ i: versszak sorszáma, lines: [...] }]
 //   ctx = { allWords: a vers összes szava (tippekhez) }
-import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=21';
+import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=22';
+import { lineImages } from './imagery.js?v=22';
 
 export const EXERCISES = {
   listen:   { name: 'Meghallgatás', short: 'Hallgasd meg és olvasd fel', help: 'Hallgasd meg, aztán olvasd fel hangosan te is.', icon: 'M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4' },
@@ -82,7 +83,11 @@ function listen(ui, set, ctx) {
   let recorder = null, recUrl = null, recChunks = [], recAudio = null;
 
   const rg = new Map(set.map(s => [s.i, rhymeGroups(s.lines)]));
-  const draw = () => { ui.body.innerHTML = sheet(set, (l, si, li, g) => ln(si, li, rhymeLine(l, rg.get(si)[li]), g === cur ? 'hl' : '')); };
+  let thought = -1;
+  const draw = () => {
+    ui.body.innerHTML = sheet(set, (l, si, li, g) => ln(si, li, rhymeLine(l, rg.get(si)[li]), g === cur ? 'hl' : ''));
+    if (cur !== thought) { thought = cur; ui.pet?.think(cur >= 0 ? lines[cur].l : null); }
+  };
   const stop = () => {
     playing = false; cur = -1; token++;
     if (audio) { audio.pause(); audio = null; }
@@ -414,7 +419,7 @@ function initials(ui, set) {
 // ================= 7. Felmondás =================
 function recall(ui, set, ctx) {
   const lines = flat(set);
-  let k = 0, shown = false, hint = false, marks = [], heard = null, rec = null, micOff = !canListen();
+  let k = 0, shown = false, hint = 0, marks = [], heard = null, rec = null, micOff = !canListen();
   const draw = () => {
     ui.body.innerHTML = sheet(set, (l, si, li, g) => {
       if (g < k) return ln(si, li, esc(l), marks[g] ? 'ok' : 'miss');
@@ -430,7 +435,8 @@ function recall(ui, set, ctx) {
         }
         return ln(si, li, esc(l), 'hl');
       }
-      return ln(si, li, `<span class="ask">${hint ? esc(words(l).slice(0, 1)[0] || '') + ' …' : 'Mondd el a következő sort'}</span>`);
+      const pics = lineImages(l).join(' ');
+      return ln(si, li, `<span class="ask">${hint >= 2 ? (pics ? pics + ' · ' : '') + esc(words(l).slice(0, 1)[0] || '') + ' …' : hint === 1 && pics ? `<span class="pics">${pics}</span>` : 'Mondd el a következő sort'}</span>`);
     });
     ui.body.querySelector('.ln.hl, .ask')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   };
@@ -439,10 +445,14 @@ function recall(ui, set, ctx) {
       ui.dock.innerHTML = `
         ${micOff ? '' : `<button class="btn big primary wide mic" id="mic">${ui.pet ? `Mondd el ${esc(ui.pet.name)}nak` : 'Mondom'}</button>`}
         <div class="row">
-          <button class="btn big grow" id="hint" ${hint ? 'disabled' : ''}>Súgás</button>
+          <button class="btn big grow" id="hint" ${hint >= 2 ? 'disabled' : ''}>${hint === 0 && lineImages(lines[k].l).length ? 'Képes súgás' : 'Első szó'}</button>
           <button class="btn big ${micOff ? 'primary' : ''} grow" id="show">Megnézem</button>
         </div>`;
-      ui.dock.querySelector('#hint').onclick = () => { hint = true; draw(); dockDraw(); };
+      ui.dock.querySelector('#hint').onclick = () => {
+        hint = hint === 0 && lineImages(lines[k].l).length ? 1 : 2;
+        if (hint === 1) { ui.pet?.think(lines[k].l); ui.tip?.('imagery', 'Képzeld el a képeket! Az agy a képeket sokkal könnyebben megjegyzi, mint a szavakat.'); }
+        draw(); dockDraw();
+      };
       ui.dock.querySelector('#show').onclick = () => { shown = true; draw(); dockDraw(); readLine(k); };
       if (!micOff) ui.dock.querySelector('#mic').onclick = listenLine;
     } else {
@@ -473,7 +483,7 @@ function recall(ui, set, ctx) {
   }
   function step(ok) {
     if (!heard) ui.pet?.react(ok ? 'good' : 'bad');
-    marks[k] = ok && !hint; k++; shown = false; hint = false; heard = null;
+    marks[k] = ok && hint < 2; k++; shown = false; hint = 0; heard = null; ui.pet?.think(null);
     ui.progress(k / lines.length);
     if (k >= lines.length) return ui.finish(marks.filter(Boolean).length / lines.length);
     draw(); dockDraw();

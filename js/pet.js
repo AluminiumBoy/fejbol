@@ -1,5 +1,5 @@
 // A kisállat állapota (grafika nélkül): nem, jóllakottság, falatok.
-import { state, save } from './store.js?v=21';
+import { state, save } from './store.js?v=22';
 
 export const NAMES = { m: 'Rókus', f: 'Roxi' };
 const EMPTY_HOURS = 96; // ennyi idő alatt ürül ki teljesen (4 nap)

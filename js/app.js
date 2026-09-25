@@ -1,12 +1,13 @@
-import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=21';
-import * as S from './store.js?v=21';
-import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=21';
-import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=21';
-import * as G from './game.js?v=21';
-import * as SH from './shop.js?v=21';
-import * as MM from './memes.js?v=21';
-import * as CD from './cards.js?v=21';
-import * as P from './pet.js?v=21';
+import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=22';
+import * as S from './store.js?v=22';
+import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=22';
+import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=22';
+import * as G from './game.js?v=22';
+import * as SH from './shop.js?v=22';
+import * as MM from './memes.js?v=22';
+import * as CD from './cards.js?v=22';
+import * as P from './pet.js?v=22';
+import { lineImages } from './imagery.js?v=22';
 
 const app = document.getElementById('app');
 const I = {
@@ -445,7 +446,7 @@ function petHeroHTML(bp) {
 }
 let petApi = null, petVoices = new Map(), bubbleTimer;
 async function loadPet(canvas, frame) {
-  const mod = await import('./pet3d.js?v=21');
+  const mod = await import('./pet3d.js?v=22');
   const p = P.pet();
   const seen = Math.min(p.seen ?? petStage(), petStage());
   const api = await mod.mountPet(canvas, { frame, gender: p.g || 'm', stage: seen, hungry: P.hungry(), onTap: () => petTap() });
@@ -694,7 +695,7 @@ VIEWS.exercise = ({ id, task }) => {
       <div class="progress" role="progressbar" aria-label="Haladás"><i style="width:0"></i></div>
     </div>
     <div class="extitle ${withPet ? 'withpet' : ''}"><h2>${ex.name}</h2><p>${esc(stanzaLabel(task.stanzas, stz.length))} · ${esc(poem.title)}</p>
-      ${withPet ? '<canvas id="petcv" class="minipet" aria-label="A kisállatod figyel"></canvas><div class="pbubble mini off" id="pbubble"></div>' : ''}</div>
+      ${withPet ? '<canvas id="petcv" class="minipet" aria-label="A kisállatod figyel"></canvas><div class="pbubble mini off" id="pbubble"></div><div class="thought off" id="thought" aria-live="polite"></div>' : ''}</div>
     <div id="exbody"></div>
     <div class="dock" id="exdock"></div>`;
   app.querySelector('#close').onclick = back;
@@ -704,7 +705,15 @@ VIEWS.exercise = ({ id, task }) => {
     attach: el => petApi?.attach(el),
     react: k => petApi?.react(k),
     listen: on => petApi?.setListening(on),
-    say: (key, txt = '') => petSay(txt, key, 1800)
+    say: (key, txt = '') => petSay(txt, key, 1800),
+    // gondolatbuborék: a sor képei (kettős kódolás)
+    think: line => {
+      const t = app.querySelector('#thought'); if (!t) return;
+      const pics = line ? lineImages(line) : [];
+      if (!pics.length) { t.classList.add('off'); return; }
+      t.innerHTML = pics.map(p => `<span>${p}</span>`).join('');
+      t.classList.remove('off'); t.classList.remove('pop'); void t.offsetWidth; t.classList.add('pop');
+    }
   } : null;
   if (withPet) loadPet(app.querySelector('#petcv'), 'mini').catch(() => app.querySelector('#petcv')?.remove());
   let badSaid = 0;
@@ -724,6 +733,8 @@ VIEWS.exercise = ({ id, task }) => {
       if (kind === 'good' && streakRun === 3) pal.say('combo', 'Hű, egymás után mind jó!');
     },
     pet: pal,
+    // egyszeri tipp
+    tip: (id, msg) => { const seen = S.state.settings.tips || (S.state.settings.tips = {}); if (seen[id]) return; seen[id] = 1; S.save(); toast(msg); },
     finish: (score, raw) => {
       if (finished) return; finished = true;
       const r = S.applyResult(poem, task, score);

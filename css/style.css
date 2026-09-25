@@ -631,3 +631,13 @@ img.tc-img.sil{filter:brightness(0) opacity(.45);background:none}
 .pbubble.mini{left:auto;right:118px;top:6px;transform:none;font-size:.88rem;padding:6px 10px;max-width:60%}
 .pbubble.mini::after{left:auto;right:-7px;bottom:auto;top:50%;margin:-7px 0 0 0;border:7px solid transparent;border-left-color:#fff;border-right:0}
 .pbubble.mini.off{transform:translateX(6px)}
+
+/* ===== gondolatbuborék (képes emlékeztető) ===== */
+.thought{position:absolute;right:112px;top:62px;display:flex;gap:4px;align-items:center;background:#fff;border-radius:22px;padding:6px 12px;font-size:1.7rem;line-height:1.2;
+  box-shadow:0 10px 24px -10px rgba(0,0,0,.6);z-index:3;transition:opacity .25s}
+.thought::before,.thought::after{content:"";position:absolute;background:#fff;border-radius:50%}
+.thought::before{width:12px;height:12px;right:-12px;top:22px}
+.thought::after{width:7px;height:7px;right:-22px;top:14px}
+.thought.off{opacity:0;pointer-events:none}
+@media (prefers-reduced-motion:no-preference){.thought.pop{animation:tpop .35s ease-out}@keyframes tpop{0%{transform:scale(.6);opacity:0}100%{transform:none;opacity:1}}}
+.ask .pics{font-size:1.5rem;letter-spacing:.1em}
