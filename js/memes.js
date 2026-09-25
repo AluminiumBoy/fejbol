@@ -1,5 +1,5 @@
 // Mém reakciók: a felhasználó saját képei (csak ezen a telefonon, IndexedDB-ben), ha nincs, beépített rajzok.
-import { state, save } from './store.js?v=20';
+import { state, save } from './store.js?v=21';
 
 const DB = 'fejbol-memes', STORE = 'imgs';
 function db() {
