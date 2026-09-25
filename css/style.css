@@ -647,3 +647,19 @@ img.tc-img.sil{filter:brightness(0) opacity(.45);background:none}
 .btn.picbtn.on{background:var(--pen-soft);border-color:var(--pen);color:var(--pen)}
 .lpics{display:none;font-size:1.05em;letter-spacing:.08em;margin-left:.3em;white-space:nowrap}
 .showpics .lpics{display:inline}
+
+/* ===== rap mód ===== */
+.rapstage{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:24px 12px;border-radius:22px;
+  background:radial-gradient(ellipse at 50% 0%,rgba(198,255,61,.14),transparent 60%),linear-gradient(160deg,#1A1030,#0E1117);border:1px solid var(--glass-brd);min-height:280px;justify-content:center}
+.raplabel{font-size:1.1rem;letter-spacing:.08em;color:var(--muted)}
+.raplabel.you{color:var(--pen);text-shadow:0 0 18px rgba(198,255,61,.5)}
+.rapline{font-family:var(--px);font-size:clamp(1.7rem,7.5vw,2.6rem);line-height:1.15;text-transform:uppercase;letter-spacing:.02em;color:#fff;text-wrap:balance}
+.rapline .rw{display:inline-block;transition:transform .12s,color .12s;color:rgba(255,255,255,.55)}
+.rapline .rw.on{color:#fff}
+.rapline .rw.cur{color:var(--pen);transform:translateY(-4px) scale(1.08);text-shadow:0 0 16px rgba(198,255,61,.6)}
+.rapline .dim{opacity:.5}
+.rapnext{color:var(--faint);font-size:1rem;min-height:1.4em}
+.beats{display:flex;gap:10px}
+.beats span{width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.12)}
+.beats span.on{background:var(--pen);box-shadow:0 0 14px var(--pen)}
+.btn.rapbtn{align-self:center;min-height:40px;font-size:1rem;letter-spacing:.06em;background:linear-gradient(135deg,#6A2BD9,#FF3DA5);border:0;color:#fff;padding-inline:22px;box-shadow:0 6px 18px -8px rgba(255,61,165,.8)}

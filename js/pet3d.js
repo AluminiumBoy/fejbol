@@ -226,7 +226,7 @@ export async function mountPet(canvas, opts = {}) {
   // ---------- állapot ----------
   const S = { gender: 'm', stage: 0, grow: STAGE_SCALE[0], growTo: STAGE_SCALE[0], asleep: false, sad: 0, sadTo: 0,
     happyT: 0, surpriseT: 0, jumpT: -1, eatT: -1, yawnT: -1, talk: 0, blinkT: 2, blink: 0, earT: 1.5,
-    look: new THREE.Vector2(), lookTo: new THREE.Vector2(), lastPointer: 0, idleT: 6, busy: false, listen: 0, listenTo: 0, sadFlash: 0 };
+    look: new THREE.Vector2(), lookTo: new THREE.Vector2(), lastPointer: 0, idleT: 6, busy: false, listen: 0, listenTo: 0, sadFlash: 0, pulseT: -1 };
   let food = null, onEaten = null, speakAn = null, voiceSrc = null, ac = null;
 
   function setGender(g) {
@@ -277,6 +277,9 @@ export async function mountPet(canvas, opts = {}) {
     else if (kind === 'great') { happy(1.6); jump(); hearts(4); sparkle(12); }
   }
   const setListening = on => { S.listenTo = on ? 1 : 0; };
+  // ütemre bólogatás (rap mód) és külső hangforrás a szájhoz
+  const pulse = () => { S.pulseT = 0; };
+  const mouth = an => { speakAn = an; };
   const tbuf = new Float32Array(1024);
   const level = an => { an.getFloatTimeDomainData(tbuf); let s = 0; for (const v of tbuf) s += v * v; return Math.sqrt(s / tbuf.length); };
 
@@ -314,7 +317,9 @@ export async function mountPet(canvas, opts = {}) {
       else if (p < .18) squash = Math.sin(p / .18 * Math.PI) * .12;
       else { const q = (p - .18) / .82; jy = Math.sin(q * Math.PI) * .38; squash = -Math.sin(q * Math.PI) * .06; }
     }
-    pet.position.y = .16 + jy;
+    let bob = 0;
+    if (S.pulseT >= 0) { S.pulseT += dt; bob = Math.max(0, 1 - S.pulseT / .22); if (S.pulseT > .3) S.pulseT = -1; }
+    pet.position.y = .16 + jy - bob * .03;
     const slump = S.sad * .04;
     pet.scale.set(S.grow * (1 + squash * .6), S.grow * (1 - squash + breath - slump), S.grow * (1 + squash * .6));
     blob.scale.setScalar(S.grow * (1 - jy * .8)); blob.material.opacity = 1 - jy;
@@ -327,7 +332,7 @@ export async function mountPet(canvas, opts = {}) {
     // tekintet
     if (!S.asleep) S.look.lerp(S.lookTo, Math.min(1, dt * 4)); else S.look.lerp(new THREE.Vector2(0, -.6), dt * 2);
     headG.rotation.y = S.look.x * .35;
-    headG.rotation.x = -S.look.y * .18 + (S.asleep ? .35 : 0) + S.sad * .18 + Math.sin(t * 1.3) * .02 + S.talk * .05 - yawn * .15;
+    headG.rotation.x = bob * .22 - S.look.y * .18 + (S.asleep ? .35 : 0) + S.sad * .18 + Math.sin(t * 1.3) * .02 + S.talk * .05 - yawn * .15;
     headG.rotation.z = Math.sin(t * .9) * .04 + (S.asleep ? .15 : 0) + S.sad * .08 + S.listen * .22;
     headG.position.y = 1.2 + breath * 2 - S.sad * .03;
     // szemek, pislogás, szemöldök
@@ -381,7 +386,7 @@ export async function mountPet(canvas, opts = {}) {
   raf = requestAnimationFrame(tick);
 
   return {
-    setGender, setStage, setMood, setSleep, poke, eat, speak, audio, jump, happy, hearts, sparkle, attach, react, setListening,
+    setGender, setStage, setMood, setSleep, poke, eat, speak, audio, jump, happy, hearts, sparkle, attach, react, setListening, pulse, mouth,
     isAsleep: () => S.asleep,
     dispose() {
       alive = false; cancelAnimationFrame(raf); io.disconnect(); ro.disconnect();

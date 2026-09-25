@@ -2,8 +2,8 @@
 //   ui  = { body, dock, progress(0..1), finish(score), cleanup(fn), toast(msg) }
 //   set = [{ i: versszak sorszáma, lines: [...] }]
 //   ctx = { allWords: a vers összes szava (tippekhez) }
-import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=23';
-import { lineImages } from './imagery.js?v=23';
+import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=24';
+import { lineImages } from './imagery.js?v=24';
 
 export const EXERCISES = {
   listen:   { name: 'Meghallgatás', short: 'Hallgasd meg és olvasd fel', help: 'Hallgasd meg, aztán olvasd fel hangosan te is.', icon: 'M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4' },
@@ -14,11 +14,12 @@ export const EXERCISES = {
   hide:     { name: 'Eltűnő szavak', short: 'Egyre több szó tűnik el', help: 'Mondd el hangosan, a hiányzó szavakkal együtt. Ha elakadsz, koppints a szóra.', icon: 'M3 12s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7zM4 4l16 16' },
   initials: { name: 'Kezdőbetűk',   short: 'Csak az első betűk látszanak', help: 'Mondd el hangosan. Csak a kezdőbetűk segítenek, ha kell, koppints a szóra.', icon: 'M5 19l5-14 5 14M7 14h6M17 19V9' },
   blitz:    { name: 'Speedrun', short: '60 mp, dönts rekordot', help: 'Válaszolj minél többre 60 másodperc alatt. A rossz válasz 3 másodpercbe kerül.', icon: 'M13 2L4 14h7l-1 8 9-12h-7z', special: true },
+  rap:      { name: 'Rap mód', short: 'Rappeld el ütemre', help: 'Szól az ütem: rappeld a verset a rókával!', icon: 'M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z', special: true },
   recall:   { name: 'Felmondás',    short: 'Fejből, soronként', help: 'Mondd el fejből a következő sort, aztán nézd meg, jó volt-e.', icon: 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3' }
 };
 
 export function run(type, ui, set, ctx) {
-  return ({ blitz, listen, rhyme, cloze, order, words: wordsEx, hide, initials, recall })[type](ui, set, ctx);
+  return ({ rap, blitz, listen, rhyme, cloze, order, words: wordsEx, hide, initials, recall })[type](ui, set, ctx);
 }
 
 // ---------- közös ----------
@@ -600,4 +601,172 @@ function blitz(ui, set, ctx) {
   }, 250);
   ui.cleanup(() => clearInterval(timer));
   q = makeQ(); draw(); ui.progress(0);
+}
+
+// ================= Rap mód =================
+// Hip-hop ütem a böngészőben (dob, basszus, akkordok), a róka ütemre rappel, a szöveg karaoke-szerűen megy.
+// Hallgasd: a róka rappel. Felelgetős: róka egy sort, te a következő ütemben. Egyedül: te rappelsz, a szöveg körönként halványul.
+let lineIdx = null;
+async function loadLineIndex() {
+  if (!lineIdx) { try { lineIdx = await (await fetch('audio/lines/index.json')).json(); } catch (e) { lineIdx = { lines: {}, dur: {} }; } }
+  return lineIdx;
+}
+const sylls = w => (norm(w).match(/[aeiou]/g) || ['x']).length;
+
+function rap(ui, set, ctx) {
+  const lines = flat(set);
+  const voice = ctx.voice === 'noemi' ? 'noemi' : 'tamas';
+  const MODES = { listen: 'Hallgasd', echo: 'Felelgetős', solo: 'Egyedül' };
+  const TEMPO = { 76: 'Lassú', 84: 'Közepes', 92: 'Gyors' };
+  let mode = 'listen', bpm = 84, playing = false, hasVoice = false;
+  let ac = null, own = false, master = null, timer = null, nextTime = 0, step = 0, plan = [], bufs = new Map(), timeouts = [];
+  const stepDur = () => 60 / bpm / 4, barLen = () => 60 / bpm * 4;
+
+  const hashOf = l => lineIdx?.lines?.[l];
+  async function prepare() {
+    await loadLineIndex();
+    hasVoice = lines.every(x => hashOf(x.l));
+    if (!hasVoice) mode = 'solo';
+    draw(); dockDraw();
+  }
+  function buildPlan() {
+    const p = [{ kind: 'intro' }];
+    if (mode === 'listen') lines.forEach((x, i) => p.push({ kind: 'fox', i }));
+    else if (mode === 'echo') lines.forEach((x, i) => { p.push({ kind: 'fox', i }); p.push({ kind: 'you', i }); });
+    else for (let r = 0; r < 3; r++) lines.forEach((x, i) => p.push({ kind: 'solo', i, r }));
+    p.push({ kind: 'end' });
+    return p;
+  }
+
+  // ---------- hangszerek ----------
+  let noiseBuf = null;
+  const noise = () => { if (!noiseBuf) { noiseBuf = ac.createBuffer(1, ac.sampleRate * .5, ac.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } return noiseBuf; };
+  function env(node, t, peak, len) { const g = ac.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + .005); g.gain.exponentialRampToValueAtTime(.0001, t + len); node.connect(g).connect(master); return g; }
+  function kick(t) { const o = ac.createOscillator(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + .22); env(o, t, .95, .38); o.start(t); o.stop(t + .4); }
+  function snare(t) {
+    const n = ac.createBufferSource(); n.buffer = noise(); const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 1500; n.connect(f); env(f, t, .5, .2); n.start(t); n.stop(t + .22);
+    const o = ac.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(200, t); env(o, t, .25, .1); o.start(t); o.stop(t + .12);
+  }
+  function hat(t, open) { const n = ac.createBufferSource(); n.buffer = noise(); const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 8000; n.connect(f); env(f, t, open ? .13 : .07, open ? .22 : .04); n.start(t); n.stop(t + .25); }
+  const midi = m => 440 * Math.pow(2, (m - 69) / 12);
+  function bass(t, m, len) { const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = midi(m); const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420; o.connect(f); env(f, t, .26, len); o.start(t); o.stop(t + len + .05); }
+  const CHORDS = [[57, 60, 64], [53, 57, 60], [55, 60, 64], [55, 59, 62]]; // Am F C G
+  const ROOTS = [45, 41, 48, 43];
+  function chord(t, b) { CHORDS[b % 4].forEach(m => { const o = ac.createOscillator(); o.type = 'triangle'; o.frequency.value = midi(m); env(o, t, .035, barLen() * .9); o.start(t); o.stop(t + barLen()); }); }
+
+  // ---------- ütemezés ----------
+  const at = (t, fn) => timeouts.push(setTimeout(fn, Math.max(0, (t - ac.currentTime) * 1000)));
+  function scheduleStep(n, t) {
+    const s = n % 16, b = Math.floor(n / 16);
+    if (b >= plan.length) return;
+    if (plan[b].kind === 'end') { if (s === 0) at(t, done); return; }
+    if (s === 0 || s === 7 || s === 10) kick(t);
+    if (s === 4 || s === 12) snare(t);
+    if (s % 2 === 0) hat(t + (s % 4 === 2 ? stepDur() * .12 : 0), s === 14);
+    if (s === 0) { bass(t, ROOTS[b % 4], stepDur() * 6); chord(t, b); scheduleBar(b, t); }
+    if (s === 8) bass(t, ROOTS[b % 4] + 7, stepDur() * 3);
+    if (s === 11) bass(t, ROOTS[b % 4] + 12, stepDur() * 2);
+    if (s % 4 === 0) at(t, () => { ui.pet?.pulse(); beatDot(s / 4); });
+  }
+  function scheduleBar(b, t) {
+    const bar = plan[b];
+    at(t, () => showBar(b));
+    if (bar.kind === 'fox') {
+      const x = lines[bar.i], buf = bufs.get(x.l);
+      if (!buf) return;
+      const src = ac.createBufferSource(); src.buffer = buf;
+      const rate = Math.max(.94, Math.min(1.15, buf.duration / (barLen() * .78)));
+      src.playbackRate.value = rate;
+      const an = ac.createAnalyser(); an.fftSize = 1024; src.connect(an); an.connect(master);
+      src.start(t + .03);
+      at(t, () => ui.pet?.mouth(an));
+      at(t + .03 + buf.duration / rate + .05, () => ui.pet?.mouth(null));
+      at(t, () => karaoke(buf.duration / rate));
+    } else if (bar.kind === 'you' || bar.kind === 'solo') {
+      at(t, () => karaoke(barLen() * .8));
+    }
+  }
+  function tick() { while (nextTime < ac.currentTime + .15) { scheduleStep(step, nextTime); nextTime += stepDur(); step++; } }
+
+  async function start() {
+    ac = ui.pet?.audio?.() || null;
+    if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); own = true; }
+    if (ac.state === 'suspended') await ac.resume();
+    master = ac.createGain(); master.gain.value = .8; master.connect(ac.destination);
+    if (mode !== 'solo') {
+      const need = [...new Set(lines.map(x => x.l))].filter(l => !bufs.has(l));
+      ui.dock.querySelector('#go').textContent = 'Betöltés…';
+      await Promise.all(need.map(async l => {
+        const r = await fetch(`audio/lines/${voice}/${hashOf(l)}.mp3`);
+        bufs.set(l, await ac.decodeAudioData(await r.arrayBuffer()));
+      }));
+    }
+    plan = buildPlan(); step = 0; nextTime = ac.currentTime + .1; playing = true;
+    timer = setInterval(tick, 25); tick();
+    dockDraw();
+  }
+  function stop() {
+    playing = false; clearInterval(timer); timer = null;
+    timeouts.forEach(clearTimeout); timeouts = [];
+    try { master?.disconnect(); } catch (e) {}
+    ui.pet?.mouth(null); ui.pet?.listen(false);
+    if (own) { ac?.close(); ac = null; }
+  }
+  function done() { stop(); ui.finish(1); }
+  ui.cleanup(stop);
+
+  // ---------- megjelenítés ----------
+  const wordsHTML = (l, r = 0) => tokens(l).map(t => {
+    if (t.t !== undefined) return r >= 2 ? '' : esc(t.t);
+    const shown = r === 0 ? esc(t.w) : r === 1 ? esc(t.w[0]) + '<span class="dim">' + '·'.repeat(Math.max(1, sylls(t.w) - 1)) + '</span>' : '<span class="dim">' + '·'.repeat(sylls(t.w)) + '</span>';
+    return `<span class="rw" data-s="${sylls(t.w)}">${shown}</span>`;
+  }).join(r >= 2 ? ' ' : '');
+  function draw() {
+    ui.body.innerHTML = `
+      <div class="rapstage">
+        <div class="raplabel px" id="rlab">${playing ? '' : 'Rap mód'}</div>
+        <div class="rapline" id="rline">${playing ? '' : esc(lines[0].l)}</div>
+        <div class="rapnext" id="rnext">${playing ? '' : esc(lines[1]?.l || '')}</div>
+        <div class="beats">${[0, 1, 2, 3].map(i => `<span data-b="${i}"></span>`).join('')}</div>
+      </div>
+      ${hasVoice ? '' : '<p class="muted small" style="margin:0;text-align:center">Ehhez a vershez nincs felvett rap-hang, ezért csak az Egyedül mód megy.</p>'}`;
+  }
+  function beatDot(i) {
+    ui.body.querySelectorAll('.beats span').forEach((d, k) => d.classList.toggle('on', k === i));
+  }
+  function showBar(b) {
+    const bar = plan[b], lab = ui.body.querySelector('#rlab'), line = ui.body.querySelector('#rline'), nxt = ui.body.querySelector('#rnext');
+    if (!lab) return;
+    ui.pet?.listen(bar.kind === 'you');
+    const total = plan.length - 2;
+    ui.progress(Math.min(1, (b) / Math.max(1, total)));
+    if (bar.kind === 'intro') { lab.textContent = 'Figyelj az ütemre…'; line.innerHTML = wordsHTML(lines[0].l, 0); nxt.textContent = ''; return; }
+    const x = lines[bar.i];
+    const r = bar.kind === 'solo' ? bar.r : 0;
+    lab.textContent = bar.kind === 'fox' ? (ui.pet ? `${ui.pet.name} rappel` : 'Figyelj!') : bar.kind === 'you' ? 'Te jössz!' : `Te rappelsz · ${bar.r + 1}. kör`;
+    lab.className = 'raplabel px ' + (bar.kind === 'you' || bar.kind === 'solo' ? 'you' : '');
+    line.innerHTML = wordsHTML(x.l, r);
+    const nb = plan[b + 1];
+    nxt.innerHTML = nb && nb.i !== undefined && nb.i !== bar.i ? (nb.kind === 'solo' && nb.r >= 1 ? '' : esc(lines[nb.i].l)) : '';
+  }
+  // szavak kiemelése a szótagszám arányában
+  function karaoke(len) {
+    const ws = [...ui.body.querySelectorAll('#rline .rw')];
+    const tot = ws.reduce((a, w) => a + +w.dataset.s, 0) || 1;
+    let acc = 0;
+    ws.forEach(w => {
+      const t0 = acc / tot * len; acc += +w.dataset.s;
+      timeouts.push(setTimeout(() => { ws.forEach(x => x.classList.remove('cur')); w.classList.add('cur', 'on'); }, t0 * 1000));
+    });
+  }
+  function dockDraw() {
+    ui.dock.innerHTML = `
+      <div class="chips" style="justify-content:center">${Object.entries(MODES).map(([k, l]) => `<button class="chip" data-m="${k}" aria-pressed="${mode === k}" ${playing || (!hasVoice && k !== 'solo') ? 'disabled' : ''}>${l}</button>`).join('')}</div>
+      <div class="chips" style="justify-content:center">${Object.entries(TEMPO).map(([k, l]) => `<button class="chip" data-t="${k}" aria-pressed="${bpm === +k}" ${playing ? 'disabled' : ''}>${l}</button>`).join('')}</div>
+      <button class="btn big primary wide px" id="go">${playing ? 'Megállítás' : 'Indulhat az ütem'}</button>`;
+    ui.dock.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { mode = b.dataset.m; dockDraw(); });
+    ui.dock.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { bpm = +b.dataset.t; dockDraw(); });
+    ui.dock.querySelector('#go').onclick = () => { if (playing) { stop(); draw(); dockDraw(); ui.progress(0); } else start().catch(() => { ui.toast('Nem sikerült elindítani a hangot.'); stop(); dockDraw(); }); };
+  }
+  draw(); dockDraw(); ui.progress(0); prepare();
 }

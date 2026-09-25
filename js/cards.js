@@ -1,6 +1,6 @@
 // Gyűjtőkártyák: 30 valódi autó fotóval (Wikimedia Commons, szabad licenc) és gyári adatokkal.
 // Csomag jár a napi küldetésért, versszakért, egész versért.
-import { state, save } from './store.js?v=23';
+import { state, save } from './store.js?v=24';
 
 export const RARITY = {
   common: { name: 'Sima', weight: 55, xpDup: 10 },
