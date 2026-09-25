@@ -1,6 +1,6 @@
 import { parseStanzas, words, esc } from './text.js';
 import * as S from './store.js';
-import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak } from './ex.js';
+import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js';
 import { searchPoems, fetchPoem, ocrImage } from './sources.js';
 
 const app = document.getElementById('app');
@@ -71,7 +71,7 @@ function ctxFor(poem) {
   return {
     allWords: lines.flatMap(words),
     allEnds: lines.map(l => words(l).slice(-1)[0]).filter(Boolean),
-    voice: S.state.settings.voice || 'anna'
+    voice: S.state.settings.voice
   };
 }
 
@@ -372,7 +372,7 @@ VIEWS.edit = ({ id }) => {
 
 VIEWS.settings = () => {
   const set = S.state.settings, voices = voiceNames();
-  const cur = set.voice || 'anna';
+  const cur = pickVoice(set.voice);
   app.innerHTML = `
     <div class="top">
       <button class="icon-btn" id="back" aria-label="Vissza">${I.back}</button>
@@ -383,19 +383,18 @@ VIEWS.settings = () => {
     <p class="label">Felolvasó hang</p>
     <div class="chips" id="voice">${Object.entries(voices).map(([k, l]) => `<button class="chip" data-v="${k}" aria-pressed="${cur === k}">${esc(l)}</button>`).join('')}</div>
     <button class="btn wide" id="try">Meghallgatom</button>
-    <p class="muted small" style="margin:0">A beépített versekhez előre felvett magyar hang tartozik. Saját versnél a telefon saját felolvasója szól${canSpeak() ? '' : ', de ezen a készüléken nem találtam magyar hangot'}.</p>
+    <p class="muted small" style="margin:0">A beépített versekhez előre elkészített, természetes magyar felolvasás tartozik. Saját versnél a telefon saját felolvasója szól${canSpeak() ? '' : ', de ezen a készüléken nem találtam magyar hangot'}.</p>
     <p class="label">Adatok</p>
     <p class="muted small" style="margin:0">A versek és a haladás csak ezen a telefonon, ebben a böngészőben tárolódnak. Nem kell hozzá fiók.</p>`;
   app.querySelector('#back').onclick = back;
   app.querySelectorAll('#size .chip').forEach(b => b.onclick = () => { S.setSize(+b.dataset.v); VIEWS.settings(); });
   app.querySelectorAll('#voice .chip').forEach(b => b.onclick = () => { set.voice = b.dataset.v; S.save(); VIEWS.settings(); });
   let a = null;
-  app.querySelector('#try').onclick = async () => {
-    try {
-      const idx = await (await fetch('audio/index.json')).json();
-      const first = Object.values(idx.lines)[0];
-      a?.pause(); a = new Audio(`audio/${set.voice || 'anna'}/${first}.mp3`); a.play();
-    } catch (e) { toast('Nem sikerült lejátszani.'); }
+  app.querySelector('#try').onclick = () => {
+    const first = parseStanzas(S.state.poems.find(p => stanzaAudio(parseStanzas(p.text)[0], set.voice))?.text || '')[0];
+    const clip = first && stanzaAudio(first, set.voice);
+    if (!clip) return toast('Nincs előre felvett vers a hangpróbához.');
+    a?.pause(); a = makeAudio(clip.url); a.play().catch(() => toast('Nem sikerült lejátszani.'));
   };
   cleanups.push(() => a?.pause());
 };

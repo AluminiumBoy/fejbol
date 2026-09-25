@@ -39,11 +39,11 @@ const clamp = x => Math.max(0, Math.min(1, x));
 
 // ---------- felolvasás (TTS) ----------
 let huVoice = null;
-function pickVoice() {
+function pickHuVoice() {
   if (!('speechSynthesis' in window)) return;
   huVoice = speechSynthesis.getVoices().find(v => /^hu/i.test(v.lang)) || null;
 }
-if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.addEventListener?.('voiceschanged', pickVoice); }
+if ('speechSynthesis' in window) { pickHuVoice(); speechSynthesis.addEventListener?.("voiceschanged", pickHuVoice); }
 export const canSpeak = () => !!huVoice;
 
 // ---------- beszédfelismerés ----------
@@ -56,16 +56,26 @@ let audioIndex = null;
 export async function loadAudioIndex() {
   try { audioIndex = await (await fetch('audio/index.json')).json(); } catch (e) {}
 }
+// a hang elemet az oldalhoz csatoljuk, mert egyes böngészők különben leállítják
+export function makeAudio(url) {
+  document.querySelectorAll('audio[data-fejbol]').forEach(a => { a.pause(); a.remove(); });
+  const a = new Audio(url); a.dataset.fejbol = '1'; a.hidden = true;
+  document.body.appendChild(a);
+  return a;
+}
 export const voiceNames = () => audioIndex?.voices || {};
-const lineAudio = (l, voice) => {
-  const h = audioIndex?.lines?.[l];
-  return h && audioIndex.voices[voice] ? `audio/${voice}/${h}.mp3` : null;
-};
+export const pickVoice = v => (audioIndex?.voices?.[v] ? v : Object.keys(audioIndex?.voices || {})[0]);
+// versszak hangfájlja + sorkezdési időpontok (mp)
+export function stanzaAudio(lines, voice) {
+  const e = audioIndex?.stanzas?.[lines.join('\n')];
+  voice = pickVoice(voice);
+  return e && voice && e.starts[voice] ? { url: `audio/${voice}/${e.file}.mp3`, starts: e.starts[voice] } : null;
+}
 
 function listen(ui, set, ctx) {
   const lines = flat(set);
-  const files = lines.map(x => lineAudio(x.l, ctx.voice));
-  const src = files.every(Boolean) ? 'file' : canSpeak() ? 'tts' : null;
+  const clips = set.map(s => stanzaAudio(s.lines, ctx.voice));
+  const src = clips.every(Boolean) ? 'file' : canSpeak() ? 'tts' : null;
   const need = src ? 2 : 3;
   let count = 0, playing = false, cur = -1, audio = null, token = 0;
   let recorder = null, recUrl = null, recChunks = [], recAudio = null;
@@ -78,24 +88,43 @@ function listen(ui, set, ctx) {
     dockDraw(); draw();
   };
   const sayLine = k => new Promise(res => {
-    if (src === 'file') {
-      audio = new Audio(files[k]); audio.onended = res; audio.onerror = res;
-      audio.play().catch(res);
-    } else {
-      const u = new SpeechSynthesisUtterance(lines[k].l);
-      u.voice = huVoice; u.lang = huVoice.lang; u.rate = 0.85;
-      u.onend = res; u.onerror = res; speechSynthesis.speak(u);
-    }
+    const u = new SpeechSynthesisUtterance(lines[k].l);
+    u.voice = huVoice; u.lang = huVoice.lang; u.rate = 0.85;
+    u.onend = res; u.onerror = res; speechSynthesis.speak(u);
+  });
+  // egy versszak lejátszása egyben (természetes hanglejtés), a sor kiemelése követi
+  const playClip = (n, offset) => new Promise(res => {
+    const { url, starts } = clips[n];
+    const el = audio = makeAudio(url);
+    el.ontimeupdate = () => {
+      if (el !== audio) return;
+      let li = 0;
+      starts.forEach((t, i) => { if (t != null && el.currentTime >= t - 0.05) li = i; });
+      if (cur !== offset + li) { cur = offset + li; draw(); }
+    };
+    el.onended = res; el.onerror = res;
+    el.play().catch(res);
   });
   const play = async () => {
     stop(); playing = true; const my = token; dockDraw();
-    for (let k = 0; k < lines.length; k++) {
-      if (my !== token) return;
-      cur = k; draw();
-      await sayLine(k);
-      if (my !== token) return;
-      const stanzaEnd = k + 1 < lines.length && lines[k + 1].si !== lines[k].si;
-      await new Promise(r => setTimeout(r, stanzaEnd ? 900 : 350));
+    if (src === 'file') {
+      let offset = 0;
+      for (let n = 0; n < set.length; n++) {
+        if (my !== token) return;
+        await playClip(n, offset);
+        offset += set[n].lines.length;
+        if (my !== token) return;
+        await new Promise(r => setTimeout(r, 700));
+      }
+    } else {
+      for (let k = 0; k < lines.length; k++) {
+        if (my !== token) return;
+        cur = k; draw();
+        await sayLine(k);
+        if (my !== token) return;
+        const stanzaEnd = k + 1 < lines.length && lines[k + 1].si !== lines[k].si;
+        await new Promise(r => setTimeout(r, stanzaEnd ? 900 : 350));
+      }
     }
     if (my === token) stop();
   };
@@ -117,7 +146,7 @@ function listen(ui, set, ctx) {
   }
   function playRec() {
     if (recAudio) { recAudio.pause(); recAudio = null; dockDraw(); return; }
-    recAudio = new Audio(recUrl); recAudio.onended = () => { recAudio = null; dockDraw(); };
+    recAudio = makeAudio(recUrl); recAudio.onended = () => { recAudio = null; dockDraw(); };
     recAudio.play(); dockDraw();
   }
 
