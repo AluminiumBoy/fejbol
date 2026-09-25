@@ -371,6 +371,19 @@ export function starsFor(score, raw) {
   return score >= 0.95 ? 3 : score >= 0.8 ? 2 : score >= 0.5 ? 1 : 0;
 }
 
+// Érme a Jutalomboltba: csak a sikeres munka ér érmét (a meghallgatás nem).
+function earnCoins({ task, pass, raw, stars, mastered, wholeDone, missionDone }) {
+  let c = 0;
+  if (task.type === 'blitz') c = Math.floor((raw || 0) / 4);
+  else if (pass && task.type !== 'listen') c = 1 + stars;
+  if (missionDone) c += 5;
+  if (mastered) c += 10;
+  if (wholeDone) c += 30;
+  state.shop = state.shop || { coins: 0, items: [], orders: [] };
+  state.shop.coins += c;
+  return c;
+}
+
 export function reward({ task, score, pass, raw, mastered, wholeDone, poem }) {
   const G = state.game;
   const before = levelInfo(G.xp), buildBefore = buildProgress(G.blocks);
@@ -410,11 +423,12 @@ export function reward({ task, score, pass, raw, mastered, wholeDone, poem }) {
   if (G.missionsDone >= 5) give('kuldetes5');
   if (buildAfter.finished > 0) give('epito');
   if (wholeDone) give('vers');
+  const coins = earnCoins({ task, pass, raw, stars, mastered, wholeDone, missionDone });
   save();
 
   const after = levelInfo(G.xp);
   return {
-    xp, blocks, stars, earned, missionDone, newCars: state.settings.world === 'car' ? newCars : [],
+    xp, blocks, stars, earned, missionDone, coins, newCars: state.settings.world === 'car' ? newCars : [],
     mission: Math.min(G.mission.done, MISSION_SIZE),
     levelUp: after.lvl > before.lvl ? after : null,
     buildDone: buildAfter.finished > buildBefore.finished ? buildBefore.stage : null

@@ -3,6 +3,7 @@ import * as S from './store.js';
 import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js';
 import { searchPoems, fetchPoem, ocrImage } from './sources.js';
 import * as G from './game.js';
+import * as SH from './shop.js';
 
 const app = document.getElementById('app');
 const I = {
@@ -113,6 +114,7 @@ VIEWS.home = () => {
     <nav class="quick">
       ${world === 'car' ? `<button class="qbtn" id="garage"><b class="px">Garázs</b><span>${G.carsUnlocked()}/${G.CARS.length} autó</span></button>` : ''}
       <button class="qbtn" id="speed"><b class="px">Speedrun</b><span>${last?.best ? `rekord: ${last.best}` : '60 mp'}</span></button>
+      <button class="qbtn" id="shop"><b class="px">Bolt</b><span>${SH.shop().coins} érme</span></button>
       <button class="qbtn" id="badges"><b class="px">Jelvények</b><span>${badgeCount}/${G.BADGES.length}</span></button>
     </nav>` : worldPickerHTML()}
     <div class="row" style="justify-content:space-between"><p class="label">Verseim</p><button class="btn ghost small" id="add">+ Új vers</button></div>
@@ -132,6 +134,7 @@ VIEWS.home = () => {
   app.querySelector('#settings').onclick = () => go('settings');
   app.querySelector('#rank').onclick = () => go('badges');
   app.querySelector('#badges')?.addEventListener('click', () => go('badges'));
+  app.querySelector('#shop')?.addEventListener('click', () => go('shop'));
   app.querySelector('#garage')?.addEventListener('click', () => go('garage'));
   app.querySelector('#speed')?.addEventListener('click', () => last && startTask(last, blitzTask(last, -1)));
   app.querySelector('#add').onclick = () => go('add');
@@ -141,6 +144,153 @@ VIEWS.home = () => {
     else startTask(last, blitzTask(last, -1));
   });
   app.querySelectorAll('.pcard').forEach(b => b.onclick = () => go('poem', { id: b.dataset.id }));
+};
+
+// ---------- Jutalombolt ----------
+const fmtDate = t => new Date(t).toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' });
+
+VIEWS.shop = () => {
+  const sh = SH.shop();
+  const pending = sh.orders.filter(o => o.status === 'pending');
+  const history = sh.orders.filter(o => o.status !== 'pending').slice(0, 5);
+  const min = Math.max(1, sh.minCash || 1);
+  const amounts = sh.rate ? [...new Set([min, min * 2, min * 5, sh.coins].filter(a => a >= min && a <= sh.coins))].sort((a, b) => a - b) : [];
+  app.innerHTML = `
+    <div class="top">
+      <button class="icon-btn" id="back" aria-label="Vissza">${I.back}</button>
+      <h1 class="t grow px">Jutalombolt</h1>
+    </div>
+    <section class="wallet"><span class="coinbig px">${sh.coins}</span><span class="muted">érme</span>
+      <span class="small muted" style="margin-left:auto;text-align:right">Minden sikeres feladat 2–4 érme.<br>Megtanult versszak +10.</span></section>
+    ${pending.map(o => `<section class="voucher">
+      <p class="label">Beváltásra vár</p>
+      <b class="px">${esc(o.name)}</b>
+      <span class="vcode px">${o.code}</span>
+      <span class="small muted">Mutasd meg egy felnőttnek, ő váltja be.</span>
+    </section>`).join('')}
+    ${sh.rate ? `<section class="shopsec">
+      <div class="row" style="justify-content:space-between"><h2 class="px">Pénzre váltás</h2><span class="small muted">1 érme = ${sh.rate} Ft</span></div>
+      ${sh.coins >= min ? `<div class="chips" id="amt">${amounts.map((a, i) => `<button class="chip" data-a="${a}" aria-pressed="${i === 0}">${a} érme · ${Math.round(a * sh.rate)} Ft</button>`).join('')}</div>
+        <button class="btn primary big px" id="cash">Beváltást kérek</button>`
+        : `<p class="muted small" style="margin:0">Legalább ${min} érme kell a beváltáshoz. Még ${min - sh.coins}.</p>`}
+    </section>` : ''}
+    ${sh.items.length ? `<section class="shopsec"><h2 class="px">Jutalmak</h2>
+      ${sh.items.map(it => `<div class="item">
+        <div class="grow"><b>${esc(it.name)}</b><br><span class="small muted">${it.price} érme</span></div>
+        ${sh.coins >= it.price ? `<button class="btn primary" data-buy="${it.id}">Megveszem</button>` : `<span class="small muted">még ${it.price - sh.coins}</span>`}
+      </div>`).join('')}
+    </section>` : ''}
+    ${!sh.rate && !sh.items.length ? `<section class="shopsec"><p class="muted" style="margin:0">A bolt még üres. Kérd meg a tesódat vagy a szüleidet, hogy tegyenek fel jutalmakat. Addig is gyűlnek az érméid.</p></section>` : ''}
+    ${history.length ? `<p class="label">Korábbiak</p><div class="slist">${history.map(o => `<div class="srow"><span class="first" style="font-family:var(--ui)">${esc(o.name)}</span><span class="small muted">${fmtDate(o.closed || o.at)}</span><span class="pill ${o.status === 'done' ? 'done' : ''}">${o.status === 'done' ? 'Beváltva' : 'Elutasítva'}</span></div>`).join('')}</div>` : ''}
+    <button class="btn ghost" id="admin">Felnőtteknek: bolt beállítása</button>`;
+  app.querySelector('#back').onclick = back;
+  app.querySelector('#admin').onclick = () => go('shopAdmin');
+  let amount = amounts[0];
+  app.querySelectorAll('#amt .chip').forEach(b => b.onclick = () => {
+    amount = +b.dataset.a;
+    app.querySelectorAll('#amt .chip').forEach(x => x.setAttribute('aria-pressed', x === b));
+  });
+  const confirmBtn = (btn, label, act) => {
+    if (btn.dataset.sure) { act(); return; }
+    btn.dataset.sure = '1'; btn.textContent = label; btn.classList.add('bad');
+    setTimeout(() => { if (btn.isConnected) { delete btn.dataset.sure; btn.classList.remove('bad'); btn.textContent = btn.id === 'cash' ? 'Beváltást kérek' : 'Megveszem'; } }, 3000);
+  };
+  app.querySelector('#cash')?.addEventListener('click', e => confirmBtn(e.currentTarget, `Biztos? ${amount} érme`, () => {
+    if (SH.cashOut(amount)) { G.sfx('win'); G.confetti(1500); VIEWS.shop(); }
+  }));
+  app.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => confirmBtn(b, 'Biztos?', () => {
+    if (SH.buyItem(b.dataset.buy)) { G.sfx('win'); G.confetti(1500); VIEWS.shop(); }
+  }));
+};
+
+let adminOk = false;
+VIEWS.shopAdmin = () => {
+  const head = t => `<div class="top"><button class="icon-btn" id="back" aria-label="Vissza">${I.back}</button><h1 class="t grow px">${t}</h1></div>`;
+  if (!adminOk) {
+    const first = !SH.hasPin();
+    app.innerHTML = head('Bolt beállítása') + `
+      <section class="shopsec">
+        <p style="margin:0">${first ? 'Adj meg egy 4 jegyű PIN-kódot. Ezzel lehet később jutalmakat felvenni és beváltásokat jóváhagyni. A gyerek ne lássa.' : 'Add meg a PIN-kódot.'}</p>
+        <form id="pinf" class="stack">
+          <input id="pin" class="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="PIN">
+          ${first ? '<input id="pin2" class="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="PIN még egyszer">' : ''}
+          <button class="btn primary big">${first ? 'PIN beállítása' : 'Belépés'}</button>
+          <p class="small" id="perr" style="margin:0;color:var(--bad)"></p>
+        </form>
+      </section>`;
+    app.querySelector('#back').onclick = back;
+    app.querySelector('#pin').focus();
+    app.querySelector('#pinf').onsubmit = async e => {
+      e.preventDefault();
+      const p = app.querySelector('#pin').value.trim(), err = app.querySelector('#perr');
+      if (!/^\d{4,8}$/.test(p)) { err.textContent = 'A PIN 4–8 számjegy legyen.'; return; }
+      if (first) {
+        if (p !== app.querySelector('#pin2').value.trim()) { err.textContent = 'A két PIN nem egyezik.'; return; }
+        await SH.setPin(p); adminOk = true; VIEWS.shopAdmin();
+      } else if (await SH.checkPin(p)) { adminOk = true; VIEWS.shopAdmin(); }
+      else { err.textContent = 'Hibás PIN.'; app.querySelector('#pin').value = ''; }
+    };
+    return;
+  }
+  const sh = SH.shop(), pending = sh.orders.filter(o => o.status === 'pending');
+  app.innerHTML = head('Bolt beállítása') + `
+    <section class="shopsec">
+      <h2 class="px">Beváltásra vár</h2>
+      ${pending.length ? pending.map(o => `<div class="item">
+        <div class="grow"><b>${esc(o.name)}</b><br><span class="small muted">${o.price} érme · kód: ${o.code} · ${fmtDate(o.at)}</span></div>
+        <button class="btn good" data-ok="${o.id}">Kiadva</button><button class="btn" data-no="${o.id}">Elutasít</button>
+      </div>`).join('') : '<p class="muted small" style="margin:0">Nincs függő kérés.</p>'}
+      <p class="small muted" style="margin:0">Elutasításnál a gyerek visszakapja az érméket.</p>
+    </section>
+    <section class="shopsec">
+      <h2 class="px">Jutalmak</h2>
+      ${sh.items.map(it => `<div class="item"><div class="grow"><b>${esc(it.name)}</b><br><span class="small muted">${it.price} érme</span></div><button class="btn ghost" data-del="${it.id}">Törlés</button></div>`).join('') || '<p class="muted small" style="margin:0">Még nincs jutalom.</p>'}
+      <form id="addf" class="two">
+        <label class="field">Jutalom<input id="iname" placeholder="Mit kap?" maxlength="60"></label>
+        <label class="field">Ár (érme)<input id="iprice" type="number" inputmode="numeric" min="1" placeholder="pl. 150"></label>
+        <button class="btn primary">Hozzáadás</button>
+      </form>
+    </section>
+    <section class="shopsec">
+      <h2 class="px">Pénzre váltás</h2>
+      <p class="small muted" style="margin:0">Hány forintot ér 1 érme, és legalább mennyit lehet egyszerre beváltani. 0 Ft = kikapcsolva.</p>
+      <form id="ratef" class="two">
+        <label class="field">1 érme = ? Ft<input id="rate" type="number" inputmode="decimal" min="0" step="0.5" value="${sh.rate || 0}"></label>
+        <label class="field">Minimum (érme)<input id="minc" type="number" inputmode="numeric" min="1" value="${sh.minCash || 50}"></label>
+        <button class="btn primary">Mentés</button>
+      </form>
+    </section>
+    <section class="shopsec">
+      <h2 class="px">Érmék: ${sh.coins}</h2>
+      <p class="small muted" style="margin:0">Kézi javítás, például bónusz jó jegyért.</p>
+      <form id="adjf" class="row"><input id="adj" class="grow pin" type="number" inputmode="numeric" placeholder="pl. 20"><button class="btn" data-sign="1">Hozzáad</button><button class="btn" data-sign="-1">Levon</button></form>
+    </section>
+    <div class="row"><button class="btn ghost" id="newpin">PIN módosítása</button><button class="btn" id="lock">Kilépés</button></div>`;
+  app.querySelector('#back').onclick = () => { adminOk = false; back(); };
+  app.querySelector('#lock').onclick = () => { adminOk = false; go('shop', {}, false); };
+  app.querySelector('#newpin').onclick = () => { SH.shop().pin = ''; S.save(); adminOk = false; VIEWS.shopAdmin(); };
+  app.querySelectorAll('[data-ok]').forEach(b => b.onclick = () => { SH.settle(b.dataset.ok, true); toast('Beváltva'); VIEWS.shopAdmin(); });
+  app.querySelectorAll('[data-no]').forEach(b => b.onclick = () => { SH.settle(b.dataset.no, false); toast('Elutasítva, érmék visszaadva'); VIEWS.shopAdmin(); });
+  app.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { SH.removeItem(b.dataset.del); VIEWS.shopAdmin(); });
+  app.querySelector('#addf').onsubmit = e => {
+    e.preventDefault();
+    const n = app.querySelector('#iname').value.trim(), p = parseInt(app.querySelector('#iprice').value, 10);
+    if (!n || !(p > 0)) return toast('Adj meg nevet és árat');
+    SH.addItem(n, p); toast('Hozzáadva'); VIEWS.shopAdmin();
+  };
+  app.querySelector('#ratef').onsubmit = e => {
+    e.preventDefault();
+    const r = Math.max(0, parseFloat(app.querySelector('#rate').value) || 0), m = Math.max(1, parseInt(app.querySelector('#minc').value, 10) || 1);
+    SH.setRate(r, m); toast(r ? 'Mentve' : 'Pénzre váltás kikapcsolva');
+  };
+  let sign = 1;
+  app.querySelectorAll('#adjf [data-sign]').forEach(b => b.onclick = () => { sign = +b.dataset.sign; });
+  app.querySelector('#adjf').onsubmit = e => {
+    e.preventDefault();
+    const n = parseInt(app.querySelector('#adj').value, 10);
+    if (!(n > 0)) return;
+    SH.adjust(sign * n); VIEWS.shopAdmin();
+  };
 };
 
 VIEWS.badges = () => {
@@ -308,6 +458,7 @@ VIEWS.result = ({ id, task, score, raw, pass, rw, wholeDone, mastered }) => {
       ${rw ? `<div class="loot">
         <span class="px">+${rw.xp} XP</span>
         ${rw.blocks ? `<span class="px">+${rw.blocks} ${G.world().unit}</span>` : ''}
+        ${rw.coins ? `<span class="px coin">+${rw.coins} érme</span>` : ''}
       </div>` : ''}
     </div>
     ${rw?.levelUp ? `<div class="levelup"><span class="lvbadge px">${rw.levelUp.lvl}</span><div><b class="px">Új rang: ${rw.levelUp.name}</b><br><span>${rw.levelUp.lvl}. szint</span></div></div>` : ''}
