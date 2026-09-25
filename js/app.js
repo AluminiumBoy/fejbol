@@ -1,14 +1,14 @@
-import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=41';
-import * as S from './store.js?v=41';
-import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=41';
-import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=41';
-import * as G from './game.js?v=41';
-import * as SH from './shop.js?v=41';
-import * as MM from './memes.js?v=41';
-import * as CD from './cards.js?v=41';
-import * as P from './pet.js?v=41';
-import { lineImages, lineScene, loadScenes } from './imagery.js?v=41';
-import { loadGloss, glossOf, hasGloss, stanzaAbout } from './gloss.js?v=41';
+import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=43';
+import * as S from './store.js?v=43';
+import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=43';
+import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=43';
+import * as G from './game.js?v=43';
+import * as SH from './shop.js?v=43';
+import * as MM from './memes.js?v=43';
+import * as CD from './cards.js?v=43';
+import * as P from './pet.js?v=43';
+import { lineImages, lineScene, loadScenes } from './imagery.js?v=43';
+import { loadGloss, glossOf, hasGloss, stanzaAbout } from './gloss.js?v=43';
 
 const app = document.getElementById('app');
 const I = {
@@ -455,7 +455,7 @@ function petHeroHTML(bp) {
 }
 let petApi = null, petVoices = new Map(), bubbleTimer;
 async function loadPet(canvas, frame) {
-  const mod = await import('./pet3d.js?v=41');
+  const mod = await import('./pet3d.js?v=43');
   const p = P.pet();
   const seen = Math.min(p.seen ?? petStage(), petStage());
   const api = await mod.mountPet(canvas, { frame, gender: p.g || 'm', stage: seen, hungry: P.hungry(), onTap: () => petTap() });
@@ -606,7 +606,7 @@ VIEWS.pet = ({ learn, exam } = {}) => {
   const openLesson = async (learnTask) => {
     if (!petApi) return;
     stopMic();
-    const { mountLesson } = await import('./lesson.js?v=41');
+    const { mountLesson } = await import('./lesson.js?v=43');
     const panel = app.querySelector('#lesson'), dock = app.querySelector('#pdock');
     dock.hidden = true; panel.hidden = false;
     const poem = (learnTask && S.getPoem(learn.id)) || S.getPoem(S.state.lastPoem) || S.state.poems[0];
@@ -657,7 +657,7 @@ VIEWS.pet = ({ learn, exam } = {}) => {
   const openExam = async (id) => {
     if (!petApi) return;
     stopMic();
-    const { mountExam } = await import('./exam.js?v=41');
+    const { mountExam } = await import('./exam.js?v=43');
     const panel = app.querySelector('#lesson'), dock = app.querySelector('#pdock');
     dock.hidden = true; panel.hidden = false;
     const poem = S.getPoem(id || S.state.lastPoem) || S.state.poems[0];

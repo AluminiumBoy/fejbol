@@ -1,6 +1,6 @@
 // Felelés-próba: a róka tanárként összevissza kérdez a versből, a végén jegyet ad.
 // Mikrofon nélkül: a gyerek hangosan felel, a róka elmondja a helyeset, a gyerek értékeli magát.
-import { parseStanzas, esc, shuffle } from './text.js?v=41';
+import { parseStanzas, esc, shuffle } from './text.js?v=43';
 
 let lineIdx = null;
 async function lineIndex() {

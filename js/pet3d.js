@@ -1,7 +1,6 @@
 // A kisállat: saját, kódból épített rajzfilmróka three.js-sel.
 // mountPet(canvas, opts) → api: setGender, setStage, setMood, setSleep, poke, eat, speak, dispose …
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -23,6 +22,16 @@ function radialTex(col) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 // bundaszerű felület: finom, irányított zaj normáltérképként
+// írisz: borostyán színátmenet sötét szegéllyel és finom sugaras csíkokkal
+function irisTex() {
+  const n = 256, c = document.createElement('canvas'); c.width = c.height = n;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(n / 2, n / 2, n * .1, n / 2, n / 2, n / 2);
+  gr.addColorStop(0, '#8A4A18'); gr.addColorStop(.55, '#C9772A'); gr.addColorStop(.85, '#7A3A12'); gr.addColorStop(1, '#2A1408');
+  g.fillStyle = gr; g.fillRect(0, 0, n, n);
+  g.strokeStyle = 'rgba(255,220,160,.35)'; g.lineWidth = 1.5;
+  for (let i = 0; i < 70; i++) { const a = i / 70 * Math.PI * 2 + Math.random() * .05; g.beginPath(); g.moveTo(n / 2 + Math.cos(a) * n * .12, n / 2 + Math.sin(a) * n * .12); g.lineTo(n / 2 + Math.cos(a) * n * .46, n / 2 + Math.sin(a) * n * .46); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
 function furNormal() {
   const n = 256, c = document.createElement('canvas'); c.width = c.height = n;
   const g = c.getContext('2d'), img = g.createImageData(n, n);
@@ -48,7 +57,15 @@ export async function mountPet(canvas, opts = {}) {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  // stúdió-környezet: meleg ég + három softbox, ettől lesznek szép csillanások a szemen, orron, bundán
+  function studioEnv() {
+    const s = new THREE.Scene();
+    s.add(new THREE.Mesh(new THREE.SphereGeometry(30, 32, 16), new THREE.MeshBasicMaterial({ side: THREE.BackSide, map: gradTex([[0, '#FFE9D2'], [.45, '#8A5AA0'], [1, '#1A1030']]) })));
+    const box = (w, h, x, y, z, c, i) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: c })); m.material.color.multiplyScalar(i); m.position.set(x, y, z); m.lookAt(0, 0, 0); s.add(m); };
+    box(8, 6, 4, 8, 6, 0xfff1e0, 5); box(6, 6, -8, 4, 3, 0xcfe0ff, 2.5); box(6, 3, -2, 5, -9, 0xffc8ee, 4);
+    return pmrem.fromScene(s, 0.02).texture;
+  }
+  scene.environment = studioEnv();
   const dayBg = gradTex([[0, '#3A1F6B'], [.55, '#B4568C'], [1, '#F2A07B']]);
   const nightBg = gradTex([[0, '#070714'], [.6, '#1C1640'], [1, '#2E2350']]);
   scene.background = dayBg;
@@ -62,10 +79,11 @@ export async function mountPet(canvas, opts = {}) {
   }
   const hemi = new THREE.HemisphereLight(0xffe2cf, 0x3a2352, 1.0); scene.add(hemi);
   const key = new THREE.DirectionalLight(0xffe7d0, 2.6); key.position.set(2.5, 5, 4); key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024); key.shadow.radius = 8; key.shadow.bias = -.0004;
+  key.shadow.mapSize.set(2048, 2048); key.shadow.radius = 10; key.shadow.bias = -.0003; key.shadow.normalBias = .02;
   Object.assign(key.shadow.camera, { left: -2.5, right: 2.5, top: 3, bottom: -1.5 }); scene.add(key);
   const fill = new THREE.DirectionalLight(0xb7a4ff, .9); fill.position.set(-4, 2.5, 2); scene.add(fill);
   const rim = new THREE.DirectionalLight(0xffc2e2, 1.8); rim.position.set(-1.5, 3, -4); scene.add(rim);
+  const spark = new THREE.PointLight(0xfff4e6, 6, 6, 2); spark.position.set(1.2, 2.2, 2.4); scene.add(spark);
 
   const floor = new THREE.Mesh(new THREE.CircleGeometry(2.4, 96), new THREE.MeshStandardMaterial({ color: 0x3E2358, roughness: .95 }));
   floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
@@ -76,7 +94,8 @@ export async function mountPet(canvas, opts = {}) {
   blob.rotation.x = -Math.PI / 2; blob.position.y = .165; scene.add(blob);
 
   const camera = new THREE.PerspectiveCamera(32, 1, .05, 100);
-  const composer = new EffectComposer(renderer);
+  const rt = new THREE.WebGLRenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType });
+  const composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), .22, .4, .97); composer.addPass(bloom);
   composer.addPass(new OutputPass());
@@ -95,11 +114,12 @@ export async function mountPet(canvas, opts = {}) {
   // ---------- anyagok ----------
   const fn = furNormal();
   const M = {
-    fur: new THREE.MeshPhysicalMaterial({ color: 0xE85A12, roughness: .72, sheen: .45, sheenColor: 0xFFB070, sheenRoughness: .5, normalMap: fn, normalScale: new THREE.Vector2(.35, .35) }),
-    cream: new THREE.MeshPhysicalMaterial({ color: 0xF7EADB, roughness: .82, sheen: .4, sheenColor: 0xffffff, sheenRoughness: .6, normalMap: fn, normalScale: new THREE.Vector2(.3, .3) }),
-    dark: new THREE.MeshPhysicalMaterial({ color: 0x3A2419, roughness: .7, sheen: .5, sheenColor: 0x8a5a40, normalMap: fn, normalScale: new THREE.Vector2(.25, .25) }),
-    eye: new THREE.MeshPhysicalMaterial({ color: 0x1A0F0C, roughness: .06, clearcoat: 1, clearcoatRoughness: .04 }),
-    iris: new THREE.MeshPhysicalMaterial({ color: 0x6B3A1E, roughness: .1, clearcoat: 1 }),
+    fur: new THREE.MeshPhysicalMaterial({ color: 0xE65A10, roughness: .88, sheen: 1, sheenColor: 0xFFB878, sheenRoughness: .38, normalMap: fn, normalScale: new THREE.Vector2(.55, .55), specularIntensity: .25 }),
+    cream: new THREE.MeshPhysicalMaterial({ color: 0xF9EEDF, roughness: .9, sheen: 1, sheenColor: 0xffffff, sheenRoughness: .45, normalMap: fn, normalScale: new THREE.Vector2(.45, .45), specularIntensity: .2 }),
+    dark: new THREE.MeshPhysicalMaterial({ color: 0x3A2419, roughness: .8, sheen: .8, sheenColor: 0x9a6a48, normalMap: fn, normalScale: new THREE.Vector2(.4, .4) }),
+    eye: new THREE.MeshPhysicalMaterial({ color: 0xF4F1EC, roughness: .04, clearcoat: 1, clearcoatRoughness: .02, ior: 1.4 }),
+    iris: new THREE.MeshPhysicalMaterial({ map: irisTex(), roughness: .05, clearcoat: 1, clearcoatRoughness: .02 }),
+    pupil: new THREE.MeshPhysicalMaterial({ color: 0x0A0705, roughness: .02, clearcoat: 1 }),
     shine: new THREE.MeshBasicMaterial({ color: 0xffffff }),
     nose: new THREE.MeshPhysicalMaterial({ color: 0x241412, roughness: .15, clearcoat: 1 }),
     mouth: new THREE.MeshStandardMaterial({ color: 0x5A1420, roughness: .6 }),
@@ -126,15 +146,17 @@ export async function mountPet(canvas, opts = {}) {
     pet.add(g); paws.push(g);
   });
   const tailG = new THREE.Group(); tailG.position.set(.1, .3, -.38); pet.add(tailG);
-  for (let i = 0; i <= 8; i++) {
-    const t = i / 8, r = .1 + Math.sin(t * Math.PI * .9) * .2;
-    const s = sph(r, i >= 7 ? M.cream : M.fur, 1, 1, 1, 32); s.position.set(Math.sin(t * 2.2) * .5, t * .85, -Math.sin(t * 3.1) * .22); tailG.add(s);
+  for (let i = 0; i <= 14; i++) {
+    const t = i / 14, r = .09 + Math.sin(t * Math.PI * .92) * .23;
+    const s = sph(r, t >= .8 ? M.cream : M.fur, 1, 1, 1, 32); s.position.set(Math.sin(t * 2.2) * .5, t * .9, -Math.sin(t * 3.1) * .22); tailG.add(s);
   }
   // ---------- fej ----------
+  const ruff = sph(.4, M.cream, 1.15, .6, .9); ruff.position.set(0, .93, .12); pet.add(ruff);
   const headG = new THREE.Group(); headG.position.set(0, 1.2, .02); pet.add(headG);
   headG.add(sph(.55, M.fur, 1.1, .94, .98));
   [-1, 1].forEach(s => { const c = sph(.24, M.cream, 1.25, .82, .95); c.position.set(s * .37, -.2, .2); headG.add(c);
     const tuft = sph(.12, M.cream, 1.3, .7, .8); tuft.position.set(s * .56, -.24, .08); tuft.rotation.z = s * .5; headG.add(tuft); });
+  [-1, 1].forEach(s => { const j = sph(.1, M.cream, 1.2, .8, .9); j.position.set(s * .48, -.36, .12); j.rotation.z = s * .9; headG.add(j); });
   const muzzle = sph(.23, M.cream, 1.25, .78, 1.05); muzzle.position.set(0, -.2, .43); headG.add(muzzle);
   const nose = sph(.075, M.nose, 1.25, .85, .9); nose.position.set(0, -.1, .66); headG.add(nose);
   const noseShine = sph(.02, M.shine, 1, 1, 1, 12); noseShine.position.set(-.025, -.08, .72); headG.add(noseShine);
@@ -147,10 +169,13 @@ export async function mountPet(canvas, opts = {}) {
   const eyes = [];
   [-1, 1].forEach(s => {
     const g = new THREE.Group(); g.position.set(s * .21, .02, .47); g.rotation.y = s * .18;
-    const e = sph(.125, M.eye, .82, 1.08, .55); g.add(e);
-    const ir = sph(.07, M.iris, .85, 1, .3, 24); ir.position.set(0, -.03, .05); g.add(ir);
-    const sh1 = sph(.036, M.shine, 1, 1, 1, 16); sh1.position.set(.04 * -s + .02, .05, .07); g.add(sh1);
-    const sh2 = sph(.016, M.shine, 1, 1, 1, 12); sh2.position.set(-.03, -.05, .07); g.add(sh2);
+    const e = sph(.135, M.eye, .9, 1.05, .8); g.add(e);
+    const ir = sph(.135, M.iris, .9 * .62, 1.05 * .62, .8 * .62, 32); ir.position.set(0, -.01, .058); ir.rotation.y = -Math.PI / 2; g.add(ir);
+    const pu = sph(.135, M.pupil, .9 * .3, 1.05 * .33, .8 * .3, 24); pu.position.set(0, -.01, .085); g.add(pu);
+    const sh1 = sph(.038, M.shine, 1, 1, 1, 16); sh1.position.set(.04 * -s + .02, .055, .11); g.add(sh1);
+    const sh2 = sph(.016, M.shine, 1, 1, 1, 12); sh2.position.set(-.035, -.05, .1); g.add(sh2);
+    // szemhéj: bundaszínű félgömb, ami lecsukódik a szemre
+    const lid = new THREE.Mesh(new THREE.SphereGeometry(.142, 40, 24, 0, Math.PI * 2, 0, Math.PI * .5), M.fur); lid.scale.set(.93, 1.08, .84); lid.rotation.x = -Math.PI / 2; g.add(lid);
     const happy = tube([V(-.085, -.02, .07), V(0, .06, .08), V(.085, -.02, .07)], .018, M.line); happy.visible = false; g.add(happy);
     const lashes = new THREE.Group(); lashes.visible = false;
     [0, 1, 2].forEach(k => { const l = tube([V(0, 0, 0), V(s * .03, .03, 0), V(s * .06, .045, -.01)], .009, M.line);
@@ -160,7 +185,7 @@ export async function mountPet(canvas, opts = {}) {
     // szemöldök: az érzelmek fő eszköze
     const brow = tube([V(-.07, 0, 0), V(0, .02, .01), V(.07, 0, 0)], .016, M.dark);
     brow.position.set(s * .21, .2, .5); brow.rotation.y = s * .2; headG.add(brow);
-    eyes.push({ g, e, ir, sh1, sh2, happy, lashes, brow, s });
+    eyes.push({ g, e, ir, pu, sh1, sh2, lid, happy, lashes, brow, s });
   });
   const blushes = [-1, 1].map(s => { const b = new THREE.Mesh(new THREE.CircleGeometry(.07, 32), M.blush); b.position.set(s * .36, -.12, .5); b.rotation.y = s * .5; headG.add(b); return b; });
   function earGeo(h, r) {
@@ -349,10 +374,14 @@ export async function mountPet(canvas, opts = {}) {
     const closed = S.blink > 0 ? Math.sin(S.blink / .16 * Math.PI) : 0;
     const surprise = S.surpriseT > 0 ? Math.sin(S.surpriseT / .7 * Math.PI) : 0;
     eyes.forEach(e => {
-      e.e.visible = e.ir.visible = e.sh1.visible = e.sh2.visible = !shut;
+      e.e.visible = e.ir.visible = e.pu.visible = e.sh1.visible = e.sh2.visible = e.lid.visible = !shut;
       e.happy.visible = shut; e.happy.rotation.z = S.asleep ? Math.PI : 0; e.happy.position.y = S.asleep ? -.04 : 0;
-      e.g.scale.y = shut ? 1 : (1 - closed * .92) * (1 - S.sad * .15 - yawn * .6) * (1 + surprise * .15);
-      e.ir.position.x = S.look.x * .02; e.ir.position.y = -.03 + S.look.y * .015;
+      // szemhéj: pislogás, szomorú félig csukott szem, ásítás; meglepődve tágra nyílik
+      const lidAmt = Math.max(0, Math.min(1, closed * .95 + S.sad * .3 + yawn * .6 - surprise * .15));
+      e.lid.rotation.x = -Math.PI / 2 + lidAmt * Math.PI * .95;
+      e.ir.position.x = e.pu.position.x = S.look.x * .03; e.ir.position.y = -.01 + S.look.y * .02; e.pu.position.y = e.ir.position.y;
+      const pk = 1 + (S.happyT > 0 ? .15 : 0) + surprise * .2;
+      e.pu.scale.set(.9 * .3 * pk, 1.05 * .33 * pk, .8 * .3 * pk);
       // szemöldök: szomorúan befelé felfelé, boldogan/meglepődve feljebb
       e.brow.position.y = .2 + surprise * .05 + (S.happyT > 0 ? .03 : 0) - yawn * .02;
       e.brow.rotation.z = e.s * (-S.sad * .45 + (S.happyT > 0 ? .1 : 0));

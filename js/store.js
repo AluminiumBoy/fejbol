@@ -1,5 +1,5 @@
 // Tárolás (a böngészőben) és a tanulási út ütemezése
-import { parseStanzas } from './text.js?v=41';
+import { parseStanzas } from './text.js?v=43';
 
 const KEY = 'fejbol.v3';
 const DAY = 864e5;
