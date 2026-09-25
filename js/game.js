@@ -41,7 +41,7 @@ const BUILDS = [
     '.....SSSSS......',
     '.....SSGSS......'] }
 ];
-const RANKS = ['NPC', 'Kezdő tesó', 'Rizzler', 'Sigma', 'Chad', 'Aura farmer', 'GigaChad', 'Main Character', 'Sigma legenda', 'GOATED', 'Brainrot Boss', 'Final Boss'];
+const RANKS = ['Újonc', 'Bronz I', 'Bronz II', 'Ezüst I', 'Ezüst II', 'Arany I', 'Arany II', 'Platina', 'Gyémánt', 'Mester', 'Nagymester', 'Legenda'];
 const cellsOf = b => b.rows.join('').replace(/\./g, '').length;
 
 export const WORLDS = {
@@ -62,7 +62,7 @@ export const WORLDS = {
     label: st => `Verseny: ${st.name}`,
     hint: 'Minden csillag 1 km. Érj célba!',
     done: st => `Célba értél: ${st.name}!`, next: 'Indul a következő futam, kicsit hosszabb pályán.',
-    badge: { name: 'Első futam', desc: 'Először értél célba, új verda' },
+    badge: { name: 'Első futam', desc: 'Először értél célba' },
     draw: drawRace
   },
   foot: {
@@ -234,15 +234,15 @@ function ball(g, x, y, px) {
 
 // ---------- jelvények ----------
 export const BADGES = [
-  { id: 'elso', name: 'Elindult a grind', desc: 'Az első feladat kész', glyph: '1', color: '#3DDC84' },
-  { id: 'versszak', name: 'Első W', desc: 'Egy versszak megy fejből', glyph: 'W', color: '#3D8BFF' },
-  { id: 'hibatlan', name: 'Tökéletes aura', desc: '5-ször 3 csillag', glyph: '★', color: '#FFC83D' },
-  { id: 'sorozat3', name: '3 napos streak', desc: '3 nap egymás után', glyph: '3', color: '#FF6B3D' },
-  { id: 'sorozat7', name: 'Egy hét, no cap', desc: '7 nap egymás után', glyph: '7', color: '#FF3D5A' },
+  { id: 'elso', name: 'Első lépés', desc: 'Az első feladat kész', glyph: '1', color: '#3DDC84' },
+  { id: 'versszak', name: 'Első versszak', desc: 'Egy versszak megy fejből', glyph: '§', color: '#3D8BFF' },
+  { id: 'hibatlan', name: 'Hibátlan', desc: '5-ször 3 csillag', glyph: '★', color: '#FFC83D' },
+  { id: 'sorozat3', name: '3 napos sorozat', desc: '3 nap egymás után', glyph: '3', color: '#FF6B3D' },
+  { id: 'sorozat7', name: 'Egy hét', desc: '7 nap egymás után', glyph: '7', color: '#FF3D5A' },
   { id: 'villam', name: 'Speedrunner', desc: '10 pont a speedrunban', glyph: '⚡', color: '#B04DFF' },
-  { id: 'kuldetes5', name: 'Grind gép', desc: '5 napi grind teljesítve', glyph: 'G', color: '#00D1C1' },
+  { id: 'kuldetes5', name: 'Kitartó', desc: '5 napi küldetés teljesítve', glyph: 'G', color: '#00D1C1' },
   { id: 'epito', name: 'Építőmester', desc: 'Az első építmény kész', glyph: '▦', color: '#C08A4B' },
-  { id: 'vers', name: 'Main Character', desc: 'Egy egész vers megy fejből', glyph: '♛', color: '#FFD700' }
+  { id: 'vers', name: 'Az egész vers', desc: 'Egy egész vers megy fejből', glyph: '♛', color: '#FFD700' }
 ];
 
 export const badgeInfo = b => b.id === 'epito' ? { ...b, ...world().badge } : b;
@@ -318,19 +318,13 @@ function tone(freq, t0, dur, type = 'square', vol = 0.06) {
   o.connect(g).connect(ac.destination);
   o.start(ac.currentTime + t0); o.stop(ac.currentTime + t0 + dur + 0.02);
 }
-function boom() {
-  const o = ac.createOscillator(), g = ac.createGain();
-  o.type = 'sine'; o.frequency.setValueAtTime(140, ac.currentTime); o.frequency.exponentialRampToValueAtTime(38, ac.currentTime + .5);
-  g.gain.setValueAtTime(.5, ac.currentTime); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + .7);
-  o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + .75);
-}
 export function sfx(kind) {
   if (state.settings.sound === false) return;
   try {
     ac = ac || new (window.AudioContext || window.webkitAudioContext)();
     if (ac.state === 'suspended') ac.resume();
     if (kind === 'good') { tone(660, 0, .08); tone(990, .07, .12); }
-    else if (kind === 'bad') { boom(); }
+    else if (kind === 'bad') { tone(160, 0, .16, 'triangle', .12); }
     else if (kind === 'block') { tone(300, 0, .05, 'triangle', .1); tone(220, .04, .08, 'triangle', .08); }
     else if (kind === 'win') { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * .09, .16)); }
     else if (kind === 'level') { [392, 523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i * .08, .2, 'square', .05)); }
