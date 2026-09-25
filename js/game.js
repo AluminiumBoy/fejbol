@@ -1,7 +1,7 @@
 // Játékréteg: XP, szintek, blokkok és építkezés, jelvények, napi küldetés, hangeffektek
-import { state, save, streak, dayKey } from './store.js?v=29';
-import { cardById } from './cards.js?v=29';
-import { petName } from './pet.js?v=29';
+import { state, save, streak, dayKey } from './store.js?v=30';
+import { cardById } from './cards.js?v=30';
+import { petName } from './pet.js?v=30';
 
 export const MISSION_SIZE = 3;
 

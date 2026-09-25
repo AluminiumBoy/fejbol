@@ -2,8 +2,8 @@
 //   ui  = { body, dock, progress(0..1), finish(score), cleanup(fn), toast(msg) }
 //   set = [{ i: versszak sorszáma, lines: [...] }]
 //   ctx = { allWords: a vers összes szava (tippekhez) }
-import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=29';
-import { lineImages, lineScene, hasHint } from './imagery.js?v=29';
+import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=30';
+import { lineImages, lineScene, hasHint } from './imagery.js?v=30';
 
 export const EXERCISES = {
   listen:   { name: 'Meghallgatás', short: 'Hallgasd meg és olvasd fel', help: 'Hallgasd meg, aztán olvasd fel hangosan te is.', icon: 'M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4' },
@@ -688,25 +688,17 @@ function rap(ui, set, ctx) {
       const buf = bufs.get(x.l);
       if (!buf) return;
       const an = ac.createAnalyser(); an.fftSize = 1024; an.connect(vbus);
-      const tim = lineIdx?.w?.[voice]?.[hashOf(x.l)];
-      if (tim && tim.length === grid.length) {
-        // minden szó a saját nyolcadára: így a sor ütemre "kopog", mint egy rap
-        grid.forEach((g, j) => {
-          const off = tim[j][0], end = j + 1 < tim.length ? tim[j + 1][0] : Math.min(buf.duration, off + tim[j][1] + .18);
-          const seg = Math.max(.06, end - off), slot = g.len * stepDur();
-          const rate = Math.max(.85, Math.min(1.5, seg / (slot * .94)));
-          const src = ac.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate;
-          const gain = ac.createGain(); gain.gain.value = g.step % 4 === 0 ? 1.2 : .9; // hangsúly az ütemen
-          src.connect(gain); gain.connect(an);
-          src.start(t + g.step * stepDur() + .01, off, seg);
-        });
-      } else {
-        const src = ac.createBufferSource(); src.buffer = buf; src.connect(an); src.start(t + .03);
-      }
+      // a sor egyben, természetesen szól az ütem elejétől (ez tetszett); csak ha túl hosszú, kicsit gyorsít
+      const rate = Math.max(1, Math.min(1.15, buf.duration / (barLen() * .9)));
+      const src = ac.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate; src.connect(an);
+      src.start(t + .03);
       at(t, () => ui.pet?.mouth(an));
-      at(t + barLen() * .95, () => ui.pet?.mouth(null));
-    }
-    if (grid && bar.kind !== 'intro') grid.forEach((g, j) => at(t + g.step * stepDur(), () => markWord(j)));
+      at(t + .03 + buf.duration / rate + .05, () => ui.pet?.mouth(null));
+      // a kiemelés a kimondott szavakat követi (a szavak időpontjai alapján)
+      const tim = lineIdx?.w?.[voice]?.[hashOf(x.l)];
+      if (tim && tim.length === grid.length) tim.forEach(([off], j) => at(t + .03 + off / rate, () => markWord(j)));
+      else grid.forEach((g, j) => at(t + g.step * stepDur(), () => markWord(j)));
+    } else if (grid && bar.kind !== 'intro') grid.forEach((g, j) => at(t + g.step * stepDur(), () => markWord(j)));
   }
   function tick() { while (nextTime < ac.currentTime + .15) { scheduleStep(step, nextTime); nextTime += stepDur(); step++; } }
 
@@ -715,11 +707,7 @@ function rap(ui, set, ctx) {
     if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); own = true; }
     if (ac.state === 'suspended') await ac.resume();
     master = ac.createGain(); master.gain.value = .8; master.connect(ac.destination);
-    // a róka hangja kis "rapper" visszhanggal (nyolcados késleltetés)
     vbus = ac.createGain(); vbus.gain.value = 1.1; vbus.connect(master);
-    const dl = ac.createDelay(1), fb = ac.createGain(), wet = ac.createGain();
-    dl.delayTime.value = stepDur() * 2; fb.gain.value = .28; wet.gain.value = .22;
-    vbus.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(master);
     if (mode !== 'solo') {
       const need = [...new Set(lines.map(x => x.l))].filter(l => !bufs.has(l));
       ui.dock.querySelector('#go').textContent = 'Betöltés…';
