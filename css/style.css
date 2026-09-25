@@ -663,3 +663,5 @@ img.tc-img.sil{filter:brightness(0) opacity(.45);background:none}
 .beats span{width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.12)}
 .beats span.on{background:var(--pen);box-shadow:0 0 14px var(--pen)}
 .btn.rapbtn{align-self:center;min-height:40px;font-size:1rem;letter-spacing:.06em;background:linear-gradient(135deg,#6A2BD9,#FF3DA5);border:0;color:#fff;padding-inline:22px;box-shadow:0 6px 18px -8px rgba(255,61,165,.8)}
+.thought.scene{font-size:.95rem;font-weight:800;line-height:1.3;color:#1B1030;max-width:min(260px,62vw);padding:10px 14px;border-radius:18px;top:56px}
+.ask .pics{font-size:1rem;letter-spacing:0;white-space:normal}

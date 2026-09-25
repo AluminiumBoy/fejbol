@@ -2,8 +2,8 @@
 //   ui  = { body, dock, progress(0..1), finish(score), cleanup(fn), toast(msg) }
 //   set = [{ i: versszak sorszáma, lines: [...] }]
 //   ctx = { allWords: a vers összes szava (tippekhez) }
-import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=24';
-import { lineImages } from './imagery.js?v=24';
+import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=25';
+import { lineImages, lineScene, hasHint } from './imagery.js?v=25';
 
 export const EXERCISES = {
   listen:   { name: 'Meghallgatás', short: 'Hallgasd meg és olvasd fel', help: 'Hallgasd meg, aztán olvasd fel hangosan te is.', icon: 'M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4' },
@@ -40,20 +40,24 @@ const ln = (si, li, content, cls = '') =>
 // ---------- képes súgás (kettős kódolás) ----------
 // a sor képei a róka gondolatbuborékában; ha nincs róka, felugró sávban. Nem számít hibának.
 function showPics(ui, line) {
-  const pics = line ? lineImages(line) : [];
-  if (!pics.length) return ui.toast('Ehhez a sorhoz nincs kép.');
-  ui.tip?.('imagery', 'Képzeld el a képeket! Az agy a képeket sokkal könnyebben megjegyzi, mint a szavakat.');
-  if (ui.pet) ui.pet.think(line); else ui.toast(pics.join(' '));
+  if (!line || !hasHint(line)) return ui.toast('Ehhez a sorhoz nincs súgás.');
+  ui.tip?.('imagery', 'Képzeld el a jelenetet! Az agy a vicces, furcsa képeket sokkal könnyebben megjegyzi, mint a szavakat.');
+  const sc = lineScene(line);
+  if (ui.pet) ui.pet.think(line); else ui.toast(sc ? sc.t : lineImages(line).join(' '));
 }
-const picBtn = (line, label = 'Képes súgás') => line && lineImages(line).length ? `<button class="btn picbtn" id="pics">💭 ${label}</button>` : '';
+const picBtn = (line, label = 'Képzeld el') => line && hasHint(line) ? `<button class="btn picbtn" id="pics">💭 ${label}</button>` : '';
 const wirePics = (ui, getLine) => ui.dock.querySelector('#pics')?.addEventListener('click', () => showPics(ui, getLine()));
 // soronkénti képek a sor végén (a teljes versszakot mutató feladatokhoz), a kapcsoló a .showpics osztály
 const linePics = l => { const p = lineImages(l); return p.length ? ` <span class="lpics">${p.join('')}</span>` : ''; };
-const picToggle = () => `<button class="btn picbtn" id="picsAll">💭 Képek a sorok mellett</button>`;
-function wirePicToggle(ui) {
+const picToggle = () => `<button class="btn picbtn" id="picsAll">💭 Képzeld el</button>`;
+function wirePicToggle(ui, set) {
+  const all = set ? flat(set) : [];
+  let i = 0;
   ui.dock.querySelector('#picsAll')?.addEventListener('click', e => {
-    const on = ui.body.classList.toggle('showpics'); e.currentTarget.classList.toggle('on', on);
-    if (on) ui.tip?.('imagery', 'Képzeld el a képeket! Az agy a képeket sokkal könnyebben megjegyzi, mint a szavakat.');
+    if (!all.length) return;
+    const x = all[i % all.length]; i++;
+    showPics(ui, x.l);
+    e.currentTarget.textContent = `💭 Képzeld el (${((i - 1) % all.length) + 1}/${all.length})`;
   });
 }
 
@@ -107,7 +111,7 @@ function listen(ui, set, ctx) {
   let thought = -1;
   const draw = () => {
     ui.body.innerHTML = sheet(set, (l, si, li, g) => ln(si, li, rhymeLine(l, rg.get(si)[li]), g === cur ? 'hl' : ''));
-    if (cur !== thought) { thought = cur; ui.pet?.think(cur >= 0 ? lines[cur].l : null); }
+    thought = cur;
   };
   const stop = () => {
     playing = false; cur = -1; token++;
@@ -337,7 +341,7 @@ function order(ui, set) {
       } else { mistakes++; ui.sfx('bad'); b.classList.add('wrong'); shake(b); setTimeout(() => b.classList.remove('wrong'), 600); }
     });
   };
-  ui.dock.innerHTML = `<p class="muted small" style="margin:0">${EXERCISES.order.help}</p><button class="btn picbtn" id="pics">💭 Képes súgás: mi jön?</button>`;
+  ui.dock.innerHTML = `<p class="muted small" style="margin:0">${EXERCISES.order.help}</p><button class="btn picbtn" id="pics">💭 Képzeld el: mi jön?</button>`;
   wirePics(ui, () => set[si]?.lines[placed]);
   start(); draw(); ui.progress(0);
 }
@@ -399,7 +403,7 @@ function hide(ui, set) {
         return `<button class="w ${revealed.has(k) ? 'shown' : 'hid'}" data-k="${k}">${esc(t.w)}</button>`;
       }
       return esc(t.w);
-    }).join('') + linePics(l)));
+    }).join('')));
     return hiddenNow;
   };
   const startRound = () => {
@@ -408,8 +412,7 @@ function hide(ui, set) {
     ui.dock.innerHTML = `
       <p class="muted small" style="margin:0">${round + 1}. kör a 3-ból: ${round === 2 ? 'minden szó eltűnt, mondd el fejből.' : 'mondd el hangosan az egészet.'} Ha elakadsz, koppints a szóra.</p>
       <button class="btn big primary wide" id="nextR">${round < 2 ? 'Elmondtam, jöhet a nehezebb' : 'Elmondtam, kész'}</button>${picToggle()}`;
-    wirePicToggle(ui);
-    if (ui.body.classList.contains('showpics')) ui.dock.querySelector('#picsAll')?.classList.add('on');
+    wirePicToggle(ui, set);
     ui.dock.querySelector('#nextR').onclick = () => {
       round++; ui.progress(round / 3);
       if (round >= 3) ui.finish(clamp(1 - reveals / Math.max(1, hiddenTotal)));
@@ -431,7 +434,7 @@ function initials(ui, set) {
     if (t.t !== undefined) return esc(t.t);
     total++;
     return `<button class="w init"><span class="fl">${esc(t.w[0])}</span><span class="rest">${esc(t.w.slice(1))}</span></button>`;
-  }).join('') + linePics(l)));
+  }).join('')));
   ui.body.onclick = e => {
     const b = e.target.closest('.w.init'); if (!b || b.classList.contains('shown')) return;
     b.classList.add('shown'); reveals++;
@@ -440,7 +443,7 @@ function initials(ui, set) {
   ui.dock.innerHTML = `
     <p class="muted small" style="margin:0">${EXERCISES.initials.help}</p>
     <button class="btn big primary wide" id="fin">Elmondtam</button>${picToggle()}`;
-  wirePicToggle(ui);
+  wirePicToggle(ui, set);
   ui.dock.querySelector('#fin').onclick = () => ui.finish(clamp(1 - reveals / Math.max(1, total)));
   ui.progress(0);
 }
@@ -464,8 +467,9 @@ function recall(ui, set, ctx) {
         }
         return ln(si, li, esc(l), 'hl');
       }
-      const pics = lineImages(l).join(' ');
-      return ln(si, li, `<span class="ask">${hint >= 2 ? (pics ? pics + ' · ' : '') + esc(words(l).slice(0, 1)[0] || '') + ' …' : hint === 1 && pics ? `<span class="pics">${pics}</span>` : 'Mondd el a következő sort'}</span>`);
+      const sc = lineScene(l), pics = lineImages(l).join(' ');
+      const cue = sc ? (ui.pet ? '💭 Képzeld el…' : esc(sc.t)) : pics;
+      return ln(si, li, `<span class="ask">${hint >= 2 ? esc(words(l).slice(0, 1)[0] || '') + ' …' : hint === 1 && cue ? `<span class="pics">${cue}</span>` : 'Mondd el a következő sort'}</span>`);
     });
     ui.body.querySelector('.ln.hl, .ask')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   };
@@ -474,12 +478,12 @@ function recall(ui, set, ctx) {
       ui.dock.innerHTML = `
         ${micOff ? '' : `<button class="btn big primary wide mic" id="mic">${ui.pet ? `Mondd el ${esc(ui.pet.name)}nak` : 'Mondom'}</button>`}
         <div class="row">
-          <button class="btn big grow" id="hint" ${hint >= 2 ? 'disabled' : ''}>${hint === 0 && lineImages(lines[k].l).length ? 'Képes súgás' : 'Első szó'}</button>
+          <button class="btn big grow" id="hint" ${hint >= 2 ? 'disabled' : ''}>${hint === 0 && hasHint(lines[k].l) ? 'Képzeld el' : 'Első szó'}</button>
           <button class="btn big ${micOff ? 'primary' : ''} grow" id="show">Megnézem</button>
         </div>`;
       ui.dock.querySelector('#hint').onclick = () => {
-        hint = hint === 0 && lineImages(lines[k].l).length ? 1 : 2;
-        if (hint === 1) { ui.pet?.think(lines[k].l); ui.tip?.('imagery', 'Képzeld el a képeket! Az agy a képeket sokkal könnyebben megjegyzi, mint a szavakat.'); }
+        hint = hint === 0 && hasHint(lines[k].l) ? 1 : 2;
+        if (hint === 1) { ui.pet?.think(lines[k].l); ui.tip?.('imagery', 'Képzeld el a jelenetet! Az agy a vicces, furcsa képeket sokkal könnyebben megjegyzi, mint a szavakat.'); }
         draw(); dockDraw();
       };
       ui.dock.querySelector('#show').onclick = () => { shown = true; draw(); dockDraw(); readLine(k); };

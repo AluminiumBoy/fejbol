@@ -1,6 +1,6 @@
 // Képes emlékeztető (kettős kódolás): minden sorhoz néhány kép, amit a róka "elképzel".
 // A beépített vershez kézzel válogatott képek, más versekhez kulcsszó-szótár.
-import { words, norm } from './text.js?v=24';
+import { words, norm } from './text.js?v=25';
 
 const CURATED = {
   'Itt van az ősz, itt van ujra,': '🍂🔁',
@@ -72,3 +72,12 @@ export function lineImages(line) {
   }
   return out;
 }
+
+// ---------- vicces mini-jelenetek (bizarr kép + történetmódszer), a róka fel is olvassa ----------
+let scenes = null;
+export async function loadScenes() {
+  if (!scenes) { try { scenes = await (await fetch('voice/scenes/index.json')).json(); } catch (e) { scenes = {}; } }
+  return scenes;
+}
+export const lineScene = line => scenes?.[line?.trim()] || null; // { h, t }
+export const hasHint = line => !!(lineScene(line) || lineImages(line).length);
