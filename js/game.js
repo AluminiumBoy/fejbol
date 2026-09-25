@@ -41,12 +41,13 @@ const BUILDS = [
     '.....SSSSS......',
     '.....SSGSS......'] }
 ];
+const RANKS = ['NPC', 'Kezdő tesó', 'Rizzler', 'Sigma', 'Chad', 'Aura farmer', 'GigaChad', 'Main Character', 'Sigma legenda', 'GOATED', 'Brainrot Boss', 'Final Boss'];
 const cellsOf = b => b.rows.join('').replace(/\./g, '').length;
 
 export const WORLDS = {
   build: {
     name: 'Építő', desc: 'Blokkokból vár és torony épül', unit: 'blokk',
-    levels: ['Újonc', 'Felfedező', 'Kalandor', 'Bányász', 'Építő', 'Lovag', 'Mesterépítő', 'Bajnok', 'Hős', 'Legenda', 'Versmester', 'Nagymester'],
+    levels: RANKS,
     stage: i => { const b = BUILDS[i % BUILDS.length]; return { ...b, size: cellsOf(b), name: i >= BUILDS.length ? `${b.name} (${Math.floor(i / BUILDS.length) + 1}.)` : b.name }; },
     label: st => `Építkezés: ${st.name}`,
     hint: 'Minden csillag egy blokk. Tanulj, és felépül!',
@@ -56,17 +57,17 @@ export const WORLDS = {
   },
   car: {
     name: 'Autós', desc: 'Versenyzés, minden csillag 1 km', unit: 'km',
-    levels: ['Tanuló vezető', 'Gokartos', 'Utcai versenyző', 'Rali pilóta', 'Pályaversenyző', 'Profi pilóta', 'Csapatkapitány', 'Bajnok', 'Világbajnok', 'Legenda', 'Versmester', 'Nagymester'],
+    levels: RANKS,
     stage: i => ({ name: `${i + 1}. futam`, size: Math.min(40 + i * 10, 100), n: i }),
     label: st => `Verseny: ${st.name}`,
     hint: 'Minden csillag 1 km. Érj célba!',
     done: st => `Célba értél: ${st.name}!`, next: 'Indul a következő futam, kicsit hosszabb pályán.',
-    badge: { name: 'Első futam', desc: 'Először értél célba' },
+    badge: { name: 'Első futam', desc: 'Először értél célba, új verda' },
     draw: drawRace
   },
   foot: {
     name: 'Focis', desc: 'Meccsek és kupák, minden csillag egy gól', unit: 'gól',
-    levels: ['Újonc', 'Utánpótlás', 'Csapattag', 'Kezdő tizenegy', 'Csapatkapitány', 'Gólvágó', 'Gólkirály', 'Válogatott', 'Világsztár', 'Legenda', 'Versmester', 'Nagymester'],
+    levels: RANKS,
     stage: i => ({ name: `${i + 1}. meccs`, size: Math.min(12 + i * 3, 30), n: i }),
     label: st => `Bajnokság: ${st.name}`,
     hint: 'Minden csillag egy gól. Nyerd meg a meccset!',
@@ -134,18 +135,45 @@ function drawBuild(canvas, prog, fresh = 0) {
   }
 }
 
-// Autós: az autó a pálya elejétől a célig halad
-const CAR_COLORS = ['#D6453D', '#2F6FD6', '#E8A317', '#2E9E5B', '#8A4FD8', '#E0662B'];
-function car(g, x, y, u, col, alpha = 1) {
+// Autós: garázs. Minden megnyert futam felold egy új autót.
+// B karosszéria, D sötét, G üveg, W kerék, L lámpa, S szárny, N neon
+export const CARS = [
+  { id: 'kiscsavo', name: 'Kiscsávó', color: '#E0662B', rows: ['....BBBBBB......', '...BGGGBGGB.....', '.BBBBBBBBBBBBBL.', '.BBBBBBBBBBBBBB.', '.DDWWDDDDDDWWDD.', '...WW......WW...'] },
+  { id: 'street', name: 'Street Racer', color: '#2F6FD6', rows: ['S...BBBBB.......', 'SS.BGGGGGB......', 'SBBBBBBBBBBBBBL.', '.BBBBBBBBBBBBBB.', '.DDWWDDDDDDWWDD.', '...WW......WW...'] },
+  { id: 'drift', name: 'Drift King', color: '#8A4FD8', neon: '#00F0FF', rows: ['....BBBBB.......', 'S..BGGGGGBB.....', 'SBBBBBBBBBBBBBBL', 'BBBBBBBBBBBBBBBB', 'DDWWDDDDDDDDWWDD', 'NNWWNNNNNNNNWWNN'] },
+  { id: 'muscle', name: 'Muscle Beast', color: '#D6453D', rows: ['..BBBBB.........', '.BGGGGBBBBBDD...', 'BBBBBBBBBBBBBBBL', 'BBBBBBBBBBBBBBBB', 'DWWWDDDDDDDWWWDD', '.WWW.......WWW..'] },
+  { id: 'terep', name: 'Terepszörny', color: '#5E7D3A', rows: ['.BBBBBBB........', '.BGGGBGGB.......', '.BBBBBBBBBBBBBBL', '.BBBBBBBBBBBBBBB', '.DWWWDDDDDDWWWD.', '..WWW......WWW..'] },
+  { id: 'formula', name: 'Formula', color: '#E23B3B', rows: ['......GG........', 'SS...BBBB.......', 'SSBBBBBBBBBBBBBL', '.WW.DDDDDDD.WW..', 'WWWW.......WWWW.', '.WW.........WW..'] },
+  { id: 'hyper', name: 'Hypercar', color: '#00C2A8', rows: ['................', '.....BBGGGG.....', 'SBBBBBBGGGGBBB..', 'SBBBBBBBBBBBBBBL', 'DDWWDDDDDDDDWWDD', '..WW........WW..'] },
+  { id: 'ghost', name: 'Neon Ghost', color: '#23262F', neon: '#FF2BD6', rows: ['................', '.....BBGGGG.....', 'SBBBBBBGGGGBBB..', 'SNNNNNNNNNNNNNNL', 'DDWWDDDDDDDDWWDD', 'NNWWNNNNNNNNWWNN'] },
+  { id: 'goat', name: 'GOAT GT', color: '#E8B00F', rows: ['SSS.............', '.S...BBGGGG.....', '.SBBBBBGGGGBBB..', 'BBBBBBBBBBBBBBBL', 'DDWWDDDDDDDDWWDD', '..WW........WW..'] }
+];
+// hány autó van feloldva: 1 + a megnyert futamok száma
+const carsUnlockedAt = b => Math.min(CARS.length, 1 + buildProgress(b, WORLDS.car).finished);
+export const carsUnlocked = () => Math.min(CARS.length, 1 + buildProgress(state.game.blocks, WORLDS.car).finished);
+export function activeCar() {
+  const n = carsUnlocked();
+  const i = CARS.findIndex(c => c.id === state.game.car);
+  return CARS[i >= 0 && i < n ? i : n - 1];
+}
+export function drawCar(g, x, y, u, c, alpha = 1, silhouette = false) {
   g.globalAlpha = alpha;
-  g.fillStyle = col; g.fillRect(x, y + u * 2, u * 10, u * 3); g.fillRect(x + u * 2, y, u * 5, u * 2);
-  g.fillStyle = '#BFE3FF'; g.fillRect(x + u * 3, y + u * .5, u * 1.6, u * 1.5); g.fillRect(x + u * 5, y + u * .5, u * 1.6, u * 1.5);
-  g.fillStyle = shade(col, .7); g.fillRect(x, y + u * 4, u * 10, u);
-  g.fillStyle = '#FFE08A'; g.fillRect(x + u * 9.2, y + u * 2.5, u * .8, u * .8);
-  g.fillStyle = '#1B1F27'; g.fillRect(x + u * 1.5, y + u * 4.2, u * 2, u * 2); g.fillRect(x + u * 6.5, y + u * 4.2, u * 2, u * 2);
-  g.fillStyle = '#9AA1AD'; g.fillRect(x + u * 2.2, y + u * 4.9, u * .6, u * .6); g.fillRect(x + u * 7.2, y + u * 4.9, u * .6, u * .6);
+  const pal = { B: c.color, D: shade(c.color, .6), G: '#9FD8FF', W: '#111318', L: '#FFE08A', S: shade(c.color, .75), N: c.neon || c.color };
+  c.rows.forEach((row, r) => [...row].forEach((ch, k) => {
+    if (ch === '.') return;
+    g.fillStyle = silhouette ? '#2A2F3B' : pal[ch];
+    g.fillRect(Math.round(x + k * u), Math.round(y + r * u), Math.ceil(u), Math.ceil(u));
+  }));
   g.globalAlpha = 1;
 }
+export function drawCarCard(canvas, c, locked) {
+  const { g, px } = setup(canvas, 20, 9);
+  g.fillStyle = locked ? '#12151C' : '#1B2130'; g.fillRect(0, 0, 20 * px, 9 * px);
+  g.fillStyle = locked ? '#1B1F28' : '#2A3142'; g.fillRect(0, 7 * px, 20 * px, 2 * px);
+  if (!locked && c.neon) { g.fillStyle = c.neon; g.globalAlpha = .25; g.fillRect(2 * px, 6.6 * px, 16 * px, px * .8); g.globalAlpha = 1; }
+  drawCar(g, 2 * px, 1.2 * px, px, c, 1, locked);
+}
+
 function drawRace(canvas, prog, fresh = 0) {
   const W = 40, H = 18;
   const { g, px } = setup(canvas, W, H);
@@ -167,10 +195,10 @@ function drawRace(canvas, prog, fresh = 0) {
   g.fillStyle = '#FFFFFF'; g.font = `700 ${Math.max(9, px * 1.1)}px system-ui,sans-serif`; g.textAlign = 'center';
   const start = 1, span = W - 3 - start - 10;
   for (let k = 0; k <= 4; k++) { const x = (start + span * k / 4 + 5) * px; g.fillText(`${Math.round(prog.size * k / 4)}`, x, (H - .6) * px); }
-  const col = CAR_COLORS[(prog.stage.n || 0) % CAR_COLORS.length];
+  const c = activeCar(), u = px * .62;
   const at = f => (start + span * Math.min(1, f)) * px;
-  if (fresh) car(g, at((prog.placed - fresh) / prog.size), road + px * .6, px * .5, col, .3);
-  car(g, at(prog.placed / prog.size), road + px * .6, px * .5, col);
+  if (fresh) drawCar(g, at((prog.placed - fresh) / prog.size), road + px * .9, u, c, .3);
+  drawCar(g, at(prog.placed / prog.size), road + px * .9, u, c);
 }
 
 // Focis: a labda a kapu felé halad, a gólok golyóként gyűlnek
@@ -206,15 +234,15 @@ function ball(g, x, y, px) {
 
 // ---------- jelvények ----------
 export const BADGES = [
-  { id: 'elso', name: 'Első lépés', desc: 'Az első feladat kész', glyph: '1', color: '#5BAA3C' },
-  { id: 'versszak', name: 'Első versszak', desc: 'Egy versszak megy fejből', glyph: '§', color: '#2340A0' },
-  { id: 'hibatlan', name: 'Hibátlan', desc: '5-ször 3 csillag', glyph: '★', color: '#E8A317' },
-  { id: 'sorozat3', name: '3 napos sorozat', desc: '3 nap egymás után', glyph: '3', color: '#D6453D' },
-  { id: 'sorozat7', name: 'Egy hét', desc: '7 nap egymás után', glyph: '7', color: '#B5452F' },
-  { id: 'villam', name: 'Villám', desc: '10 pont a villámkörben', glyph: 'V', color: '#8A4FD8' },
-  { id: 'kuldetes5', name: 'Küldetésvadász', desc: '5 napi küldetés teljesítve', glyph: 'K', color: '#0F8B8D' },
-  { id: 'epito', name: 'Építőmester', desc: 'Az első építmény kész', glyph: '▦', color: '#7A4B26' },
-  { id: 'vers', name: 'Megtanultad!', desc: 'Egy egész vers megy fejből', glyph: '♛', color: '#C4850B' }
+  { id: 'elso', name: 'Elindult a grind', desc: 'Az első feladat kész', glyph: '1', color: '#3DDC84' },
+  { id: 'versszak', name: 'Első W', desc: 'Egy versszak megy fejből', glyph: 'W', color: '#3D8BFF' },
+  { id: 'hibatlan', name: 'Tökéletes aura', desc: '5-ször 3 csillag', glyph: '★', color: '#FFC83D' },
+  { id: 'sorozat3', name: '3 napos streak', desc: '3 nap egymás után', glyph: '3', color: '#FF6B3D' },
+  { id: 'sorozat7', name: 'Egy hét, no cap', desc: '7 nap egymás után', glyph: '7', color: '#FF3D5A' },
+  { id: 'villam', name: 'Speedrunner', desc: '10 pont a speedrunban', glyph: '⚡', color: '#B04DFF' },
+  { id: 'kuldetes5', name: 'Grind gép', desc: '5 napi grind teljesítve', glyph: 'G', color: '#00D1C1' },
+  { id: 'epito', name: 'Építőmester', desc: 'Az első építmény kész', glyph: '▦', color: '#C08A4B' },
+  { id: 'vers', name: 'Main Character', desc: 'Egy egész vers megy fejből', glyph: '♛', color: '#FFD700' }
 ];
 
 export const badgeInfo = b => b.id === 'epito' ? { ...b, ...world().badge } : b;
@@ -250,7 +278,9 @@ export function reward({ task, score, pass, raw, mastered, wholeDone, poem }) {
   if (stars === 3) G.perfect++;
   if (task.type === 'blitz' && raw > (poem.best || 0)) poem.best = raw;
 
+  const carsBefore = carsUnlockedAt(G.blocks - blocks);
   const buildAfter = buildProgress(G.blocks);
+  const newCars = CARS.slice(carsBefore, carsUnlockedAt(G.blocks));
   const earned = [];
   const give = id => { if (!G.badges.includes(id)) { G.badges.push(id); earned.push(badgeInfo(BADGES.find(b => b.id === id))); } };
   give('elso');
@@ -266,7 +296,7 @@ export function reward({ task, score, pass, raw, mastered, wholeDone, poem }) {
 
   const after = levelInfo(G.xp);
   return {
-    xp, blocks, stars, earned, missionDone,
+    xp, blocks, stars, earned, missionDone, newCars: state.settings.world === 'car' ? newCars : [],
     mission: Math.min(G.mission.done, MISSION_SIZE),
     levelUp: after.lvl > before.lvl ? after : null,
     buildDone: buildAfter.finished > buildBefore.finished ? buildBefore.stage : null
@@ -288,13 +318,19 @@ function tone(freq, t0, dur, type = 'square', vol = 0.06) {
   o.connect(g).connect(ac.destination);
   o.start(ac.currentTime + t0); o.stop(ac.currentTime + t0 + dur + 0.02);
 }
+function boom() {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = 'sine'; o.frequency.setValueAtTime(140, ac.currentTime); o.frequency.exponentialRampToValueAtTime(38, ac.currentTime + .5);
+  g.gain.setValueAtTime(.5, ac.currentTime); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + .7);
+  o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + .75);
+}
 export function sfx(kind) {
   if (state.settings.sound === false) return;
   try {
     ac = ac || new (window.AudioContext || window.webkitAudioContext)();
     if (ac.state === 'suspended') ac.resume();
     if (kind === 'good') { tone(660, 0, .08); tone(990, .07, .12); }
-    else if (kind === 'bad') { tone(180, 0, .18, 'sawtooth', .05); }
+    else if (kind === 'bad') { boom(); }
     else if (kind === 'block') { tone(300, 0, .05, 'triangle', .1); tone(220, .04, .08, 'triangle', .08); }
     else if (kind === 'win') { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * .09, .16)); }
     else if (kind === 'level') { [392, 523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i * .08, .2, 'square', .05)); }

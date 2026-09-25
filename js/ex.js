@@ -12,7 +12,7 @@ export const EXERCISES = {
   words:    { name: 'Szókirakó',    short: 'Rakd össze a sort szavakból', help: 'Koppints a szavakra a helyes sorrendben.', icon: 'M3 7h6v4H3zM11 7h10v4H11zM3 14h10v4H3zM15 14h6v4h-6z' },
   hide:     { name: 'Eltűnő szavak', short: 'Egyre több szó tűnik el', help: 'Mondd el hangosan, a hiányzó szavakkal együtt. Ha elakadsz, koppints a szóra.', icon: 'M3 12s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7zM4 4l16 16' },
   initials: { name: 'Kezdőbetűk',   short: 'Csak az első betűk látszanak', help: 'Mondd el hangosan. Csak a kezdőbetűk segítenek, ha kell, koppints a szóra.', icon: 'M5 19l5-14 5 14M7 14h6M17 19V9' },
-  blitz:    { name: 'Villámkör', short: '60 másodperc, gyűjts pontot!', help: 'Válaszolj minél többre 60 másodperc alatt. A rossz válasz 3 másodpercbe kerül.', icon: 'M13 2L4 14h7l-1 8 9-12h-7z', special: true },
+  blitz:    { name: 'Speedrun', short: '60 mp, dönts rekordot', help: 'Válaszolj minél többre 60 másodperc alatt. A rossz válasz 3 másodpercbe kerül.', icon: 'M13 2L4 14h7l-1 8 9-12h-7z', special: true },
   recall:   { name: 'Felmondás',    short: 'Fejből, soronként', help: 'Mondd el fejből a következő sort, aztán nézd meg, jó volt-e.', icon: 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3' }
 };
 

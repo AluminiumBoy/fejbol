@@ -84,7 +84,7 @@ function levelHTML() {
   const L = G.levelInfo();
   return `<div class="lvl">
     <span class="lvbadge px">${L.lvl}</span>
-    <div class="grow"><div class="row" style="justify-content:space-between;gap:6px"><b class="px">${L.name}</b><span class="small muted px">${L.cur} / ${L.need} XP</span></div>
+    <div class="grow"><div class="row" style="justify-content:space-between;gap:6px"><b class="px">${L.name}</b><span class="small muted px">${L.cur} / ${L.need} aura</span></div>
     <div class="xpbar"><i style="width:${Math.round(L.frac * 100)}%"></i></div></div>
   </div>`;
 }
@@ -97,20 +97,21 @@ VIEWS.home = () => {
   const bp = G.buildProgress(), W = G.world();
   app.innerHTML = `
     <div class="top"><h1 class="brand grow">Fejből</h1>
-      ${S.streak() ? `<span class="streak px" title="nap egymás után">${S.streak()} nap</span>` : ''}
+      ${S.streak() ? `<span class="streak px" title="napos streak">🔥 ${S.streak()}</span>` : ''}
       <button class="icon-btn" id="settings" aria-label="Beállítások">${I.gear}</button></div>
     ${levelHTML()}
     <section class="mission ${m.claimed ? 'claimed' : ''}">
-      <div class="row" style="justify-content:space-between"><p class="label">Mai küldetés</p><span class="px">${m.done}/${G.MISSION_SIZE}</span></div>
+      <div class="row" style="justify-content:space-between"><p class="label">Napi grind</p><span class="px">${m.done}/${G.MISSION_SIZE}</span></div>
       <div class="mslots">${Array.from({ length: G.MISSION_SIZE }, (_, i) => `<span class="${i < m.done ? 'on' : ''}"></span>`).join('')}<span class="chest ${m.claimed ? 'open' : ''}" aria-hidden="true"></span></div>
-      <h2 class="px">${m.claimed ? 'Mára kész! A láda a tiéd.' : m.done ? `Még ${G.MISSION_SIZE - m.done} feladat, és jár a láda!` : '3 rövid feladat, kb. 5 perc'}</h2>
-      ${last ? `<button class="btn big wide px ${m.claimed ? '' : 'primary'}" id="cont">${m.claimed ? 'Még egy kör?' : m.done ? 'Folytatom' : 'Indulás!'}</button>` : ''}
+      <h2 class="px">${m.claimed ? 'Mára kész. Hatalmas W.' : m.done ? `Még ${G.MISSION_SIZE - m.done}, és nyílik a láda` : '3 feladat, 5 perc. Hajrá.'}</h2>
+      ${last ? `<button class="btn big wide px ${m.claimed ? '' : 'primary'}" id="cont">${m.claimed ? 'Még egy kör' : m.done ? 'Folytasd' : "Let's go"}</button>` : ''}
       ${last && lastTask ? `<p class="small muted" style="margin:0">Következik: ${esc(last.title)} · ${esc(taskText(last, lastTask).title)}</p>` : ''}
     </section>
     ${S.state.settings.world ? `<section class="buildcard">
       <div class="row" style="justify-content:space-between"><p class="label">${esc(W.label(bp.stage))}</p><span class="px small">${bp.placed} / ${bp.size} ${W.unit}</span></div>
       <canvas id="build" aria-label="${esc(W.label(bp.stage))}: ${bp.placed} / ${bp.size} ${W.unit}"></canvas>
       <p class="small muted" style="margin:0">${W.hint}</p>
+      ${S.state.settings.world === 'car' ? `<button class="btn wide px" id="garage">Garázs · ${G.carsUnlocked()} / ${G.CARS.length} verda</button>` : ''}
     </section>` : worldPickerHTML()}
     <p class="label">Verseim</p>
     <div class="cards">${poems.map(p => {
@@ -134,6 +135,7 @@ VIEWS.home = () => {
   });
   app.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { setWorld(b.dataset.pick); G.sfx('win'); VIEWS.home(); });
   app.querySelector('#settings').onclick = () => go('settings');
+  app.querySelector('#garage')?.addEventListener('click', () => go('garage'));
   app.querySelector('#add').onclick = () => go('add');
   app.querySelector('#cont')?.addEventListener('click', () => {
     G.sfx('block');
@@ -154,6 +156,14 @@ function worldPickerHTML() {
 function setWorld(k) {
   S.state.settings.world = k; S.save();
   document.documentElement.dataset.world = k;
+}
+
+const HYPE = { good: ['W', 'goated', 'no cap', 'let him cook', '+aura', 'sigma move', 'clean', 'ez'], bad: ['L', 'bruh', '-aura', 'nah', 'NPC move', 'skill issue'] };
+function popup(kind) {
+  const list = HYPE[kind], t = document.createElement('div');
+  t.className = 'hype ' + kind; t.textContent = list[Math.floor(Math.random() * list.length)];
+  t.style.setProperty('--r', (Math.random() * 16 - 8).toFixed(1) + 'deg');
+  document.body.appendChild(t); setTimeout(() => t.remove(), 900);
 }
 
 function blitzTask(poem, scope) {
@@ -183,8 +193,8 @@ VIEWS.poem = ({ id, scope = -1 }) => {
       <button class="btn big wide" id="go">Kezdjük</button>
     </section>` : `<section class="next rest">
       <p class="label">Mára kész</p>
-      <h2>Ügyes vagy, minden megy!</h2>
-      <p>Holnap jön a következő ismétlés. Addig lent szabadon gyakorolhatsz.</p>
+      <h2>Minden megy. Sigma.</h2>
+      <p>Holnap jön a következő ismétlés. Addig lent szabadon gyakorolhatsz, vagy dönts rekordot a speedrunban.</p>
     </section>`}
     <p class="label">Versszakok</p>
     <div class="slist">${stz.map((lines, i) => {
@@ -239,7 +249,7 @@ VIEWS.exercise = ({ id, task }) => {
     progress: f => { bar.style.width = Math.round(f * 100) + '%'; },
     cleanup: f => cleanups.push(f),
     toast,
-    sfx: G.sfx,
+    sfx: kind => { G.sfx(kind); if (kind === 'good' || kind === 'bad') popup(kind); },
     finish: (score, raw) => {
       if (finished) return; finished = true;
       const r = S.applyResult(poem, task, score);
@@ -254,10 +264,10 @@ VIEWS.result = ({ id, task, score, raw, pass, rw, wholeDone, mastered }) => {
   const poem = S.getPoem(id); if (!poem) return go('home', {}, false);
   const stars = rw ? rw.stars : G.starsFor(score, raw);
   const blitz = task.type === 'blitz';
-  const head = blitz ? `${raw} pont!` : wholeDone ? 'Megtanultad!' : ['Gyakoroljuk még', 'Majdnem!', 'Szép munka!', 'Hibátlan!'][stars];
+  const head = blitz ? `${raw} pont` : wholeDone ? 'Main Character' : ['L, de visszajövünk', 'Majdnem W', 'W', 'GOATED'][stars];
   let msg;
-  if (blitz) msg = raw >= (poem.best || 0) && raw > 0 ? 'Új rekord!' : `A rekordod: ${poem.best || 0} pont.`;
-  else if (wholeDone) msg = 'Az egész vers megy fejből. Ez igazi teljesítmény!';
+  if (blitz) msg = raw >= (poem.best || 0) && raw > 0 ? 'ÚJ REKORD. Aura: kritikus szinten.' : `A rekordod: ${poem.best || 0} pont. Döntsd meg.`;
+  else if (wholeDone) msg = 'Az egész vers megy fejből. Ez már nem aura, ez legenda.';
   else if (task.kind === 'free') msg = pass ? 'Ez jól ment.' : 'Még egy kör, és menni fog.';
   else if (task.kind === 'learn') msg = pass ? (mastered ? 'Ez a versszak megvan! Holnap ismétlünk.' : 'Jöhet a következő lépés.') : 'Ehhez a lépéshez 80% kell. Próbáld újra, menni fog.';
   else if (task.kind === 'review') msg = pass ? 'Megmaradt! A következő ismétlés később jön.' : 'Egy kicsit elfelejtődött. Átvesszük újra a kezdőbetűkkel.';
@@ -271,13 +281,14 @@ VIEWS.result = ({ id, task, score, raw, pass, rw, wholeDone, mastered }) => {
       <h2>${head}</h2>
       <p>${blitz ? '' : `<b>${Math.round(score * 100)}%</b> · `}${msg}</p>
       ${rw ? `<div class="loot">
-        <span class="px">+${rw.xp} XP</span>
+        <span class="px">+${rw.xp} aura</span>
         ${rw.blocks ? `<span class="px">+${rw.blocks} ${G.world().unit}</span>` : ''}
       </div>` : ''}
     </div>
-    ${rw?.levelUp ? `<div class="levelup"><span class="lvbadge px">${rw.levelUp.lvl}</span><div><b class="px">Szintlépés!</b><br><span>Új rang: ${rw.levelUp.name}</span></div></div>` : ''}
-    ${rw?.missionDone ? `<div class="levelup chestwin"><span class="chest open" aria-hidden="true"></span><div><b class="px">Mai küldetés teljesítve!</b><br><span>A láda bónusza: +30 XP</span></div></div>`
-      : rw ? `<div class="note small">Mai küldetés: ${m.done}/${G.MISSION_SIZE}${m.claimed ? ' (kész)' : ''}</div>` : ''}
+    ${rw?.levelUp ? `<div class="levelup"><span class="lvbadge px">${rw.levelUp.lvl}</span><div><b class="px">Rangot léptél: ${rw.levelUp.name}</b><br><span>Az aurád szintet lépett.</span></div></div>` : ''}
+    ${rw?.missionDone ? `<div class="levelup chestwin"><span class="chest open" aria-hidden="true"></span><div><b class="px">Napi grind kész, nyílik a láda</b><br><span>+30 aura bónusz</span></div></div>`
+      : rw ? `<div class="note small">Napi grind: ${m.done}/${G.MISSION_SIZE}${m.claimed ? ' (kész)' : ''}</div>` : ''}
+    ${(rw?.newCars || []).map(c => `<div class="newcar"><p class="label">Új verda feloldva</p><canvas data-car="${c.id}"></canvas><b class="px">${esc(c.name)}</b><button class="btn primary px" data-drive="${c.id}">Beülök</button></div>`).join('')}
     ${rw?.buildDone ? `<div class="levelup"><span class="lvbadge px">✓</span><div><b class="px">${esc(G.world().done(rw.buildDone))}</b><br><span>${G.world().next}</span></div></div>` : ''}
     ${(rw?.earned || []).map(b => `<div class="levelup"><span class="bico px" style="--bc:${b.color}">${b.glyph}</span><div><b class="px">Új jelvény: ${esc(b.name)}</b><br><span>${esc(b.desc)}</span></div></div>`).join('')}
     ${rw?.blocks && S.state.settings.world ? `<section class="buildcard"><p class="label">${esc(G.world().label(bp.stage))} · ${bp.placed} / ${bp.size} ${G.world().unit}</p><canvas id="build"></canvas></section>` : ''}
@@ -289,8 +300,10 @@ VIEWS.result = ({ id, task, score, raw, pass, rw, wholeDone, mastered }) => {
   requestAnimationFrame(() => {
     const c = app.querySelector('#build');
     if (c) G.drawProgress(c, bp, Math.min(rw.blocks, bp.placed));
+    app.querySelectorAll('canvas[data-car]').forEach(cv => G.drawCarCard(cv, G.CARS.find(x => x.id === cv.dataset.car), false));
   });
-  if (wholeDone || rw?.levelUp || rw?.missionDone) { G.sfx(rw?.levelUp ? 'level' : 'win'); G.confetti(); }
+  app.querySelectorAll('[data-drive]').forEach(b => b.onclick = () => { S.state.game.car = b.dataset.drive; S.save(); G.sfx('win'); toast('Beültél. Menjünk.'); b.disabled = true; });
+  if (wholeDone || rw?.levelUp || rw?.missionDone || rw?.newCars?.length) { G.sfx(rw?.levelUp ? 'level' : 'win'); G.confetti(); }
   else if (stars >= 2) G.sfx('win');
   app.querySelector('#next')?.addEventListener('click', () => go('exercise', { id, task: next }, false));
   app.querySelector('#again').onclick = () => go('exercise', { id, task }, false);
@@ -442,6 +455,27 @@ VIEWS.edit = ({ id }) => {
     if (!S.state.poems.length) S.state.poems.push(S.makePoem({ title: 'Névtelen vers', author: '', text: 'Írd ide a verset.' }));
     S.save(); go('home', {}, false);
   };
+};
+
+VIEWS.garage = () => {
+  const n = G.carsUnlocked(), cur = G.activeCar();
+  app.innerHTML = `
+    <div class="top">
+      <button class="icon-btn" id="back" aria-label="Vissza">${I.back}</button>
+      <h1 class="t grow px">Garázs</h1><span class="px muted">${n} / ${G.CARS.length}</span>
+    </div>
+    <p class="muted small" style="margin:0">Minden megnyert futam után új verda jár. Koppints arra, amelyikkel versenyezni akarsz.</p>
+    <div class="garage">${G.CARS.map((c, i) => {
+      const locked = i >= n;
+      return `<button class="gcar ${c.id === cur.id ? 'sel' : ''}" data-id="${c.id}" ${locked ? 'disabled' : ''}>
+        <canvas data-car="${c.id}"></canvas>
+        <b class="px">${locked ? '???' : esc(c.name)}</b>
+        <span>${locked ? `${i}. futam után` : c.id === cur.id ? 'Ezzel mész' : 'Kiválasztom'}</span>
+      </button>`;
+    }).join('')}</div>`;
+  requestAnimationFrame(() => app.querySelectorAll('canvas[data-car]').forEach((cv, i) => G.drawCarCard(cv, G.CARS[i], i >= n)));
+  app.querySelector('#back').onclick = back;
+  app.querySelectorAll('.gcar:not([disabled])').forEach(b => b.onclick = () => { S.state.game.car = b.dataset.id; S.save(); G.sfx('block'); VIEWS.garage(); });
 };
 
 VIEWS.settings = () => {
