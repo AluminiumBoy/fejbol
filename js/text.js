@@ -107,9 +107,13 @@ export function rhymeGroups(lines) {
   return out;
 }
 // a sor HTML-je, a rímelő utolsó szó kiemelve
-export function rhymeLine(line, grp) {
-  if (grp < 0) return esc(line);
+// gl: (szó) → van-e magyarázata; ha igen, koppintható, pontozottan aláhúzott szó lesz
+export function rhymeLine(line, grp, gl) {
   const tk = tokens(line); let last = -1;
   tk.forEach((t, i) => { if (t.w) last = i; });
-  return tk.map((t, i) => t.t !== undefined ? esc(t.t) : i === last ? `<span class="rh rh${grp % 2}">${esc(t.w)}</span>` : esc(t.w)).join('');
+  const word = (w, cls) => {
+    const inner = cls ? `<span class="${cls}">${esc(w)}</span>` : esc(w);
+    return gl && gl(w) ? `<span class="gl" data-g="${esc(w.toLowerCase())}" role="button" tabindex="0">${inner}</span>` : inner;
+  };
+  return tk.map((t, i) => t.t !== undefined ? esc(t.t) : word(t.w, grp >= 0 && i === last ? `rh rh${grp % 2}` : '')).join('');
 }

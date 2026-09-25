@@ -2,8 +2,9 @@
 //   ui  = { body, dock, progress(0..1), finish(score), cleanup(fn), toast(msg) }
 //   set = [{ i: versszak sorszáma, lines: [...] }]
 //   ctx = { allWords: a vers összes szava (tippekhez) }
-import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=32';
-import { lineImages, lineScene, hasHint } from './imagery.js?v=32';
+import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=35';
+import { lineImages, lineScene, hasHint } from './imagery.js?v=35';
+import { hasGloss } from './gloss.js?v=35';
 
 export const EXERCISES = {
   listen:   { name: 'Meghallgatás', short: 'Hallgasd meg és olvasd fel', help: 'Hallgasd meg, aztán olvasd fel hangosan te is.', icon: 'M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4' },
@@ -113,7 +114,7 @@ function listen(ui, set, ctx) {
   const rg = new Map(set.map(s => [s.i, rhymeGroups(s.lines)]));
   let thought = -1;
   const draw = () => {
-    ui.body.innerHTML = sheet(set, (l, si, li, g) => ln(si, li, rhymeLine(l, rg.get(si)[li]), g === cur ? 'hl' : ''));
+    ui.body.innerHTML = sheet(set, (l, si, li, g) => ln(si, li, rhymeLine(l, rg.get(si)[li], hasGloss), g === cur ? 'hl' : ''));
     thought = cur;
   };
   const stop = () => {

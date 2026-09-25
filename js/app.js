@@ -1,13 +1,14 @@
-import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=32';
-import * as S from './store.js?v=32';
-import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=32';
-import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=32';
-import * as G from './game.js?v=32';
-import * as SH from './shop.js?v=32';
-import * as MM from './memes.js?v=32';
-import * as CD from './cards.js?v=32';
-import * as P from './pet.js?v=32';
-import { lineImages, lineScene, loadScenes } from './imagery.js?v=32';
+import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=35';
+import * as S from './store.js?v=35';
+import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=35';
+import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=35';
+import * as G from './game.js?v=35';
+import * as SH from './shop.js?v=35';
+import * as MM from './memes.js?v=35';
+import * as CD from './cards.js?v=35';
+import * as P from './pet.js?v=35';
+import { lineImages, lineScene, loadScenes } from './imagery.js?v=35';
+import { loadGloss, glossOf, hasGloss, stanzaAbout } from './gloss.js?v=35';
 
 const app = document.getElementById('app');
 const I = {
@@ -451,7 +452,7 @@ function petHeroHTML(bp) {
 }
 let petApi = null, petVoices = new Map(), bubbleTimer;
 async function loadPet(canvas, frame) {
-  const mod = await import('./pet3d.js?v=32');
+  const mod = await import('./pet3d.js?v=35');
   const p = P.pet();
   const seen = Math.min(p.seen ?? petStage(), petStage());
   const api = await mod.mountPet(canvas, { frame, gender: p.g || 'm', stage: seen, hungry: P.hungry(), onTap: () => petTap() });
@@ -601,7 +602,7 @@ VIEWS.pet = ({ learn } = {}) => {
   const openLesson = async (learnTask) => {
     if (!petApi) return;
     stopMic();
-    const { mountLesson } = await import('./lesson.js?v=32');
+    const { mountLesson } = await import('./lesson.js?v=35');
     const panel = app.querySelector('#lesson'), dock = app.querySelector('#pdock');
     dock.hidden = true; panel.hidden = false;
     const poem = (learnTask && S.getPoem(learn.id)) || S.getPoem(S.state.lastPoem) || S.state.poems[0];
@@ -616,6 +617,8 @@ VIEWS.pet = ({ learn } = {}) => {
       say: (t, k, ms) => petSay(t, k, ms),
       sayUrl: petSayUrl,
       toast,
+      about: i => showAbout(i),
+      useMic: S.state.settings.lessonMic === true,
       cleanup: f => cleanups.push(f),
       onReward: () => {
         if (rewards >= 3) return; rewards++;
@@ -727,7 +730,7 @@ VIEWS.poem = ({ id, scope = -1 }) => {
       <button class="tile ${e.special ? 'special' : ''}" data-t="${k}"><svg class="ic" viewBox="0 0 24 24"><path d="${e.icon}"/></svg><b>${e.name}</b><span>${e.short}</span></button>`).join('')}
     </div>
     <details class="stack"><summary class="label" style="cursor:pointer;padding:6px 0">A teljes vers</summary>
-      <div class="sheet"><div class="poem">${stz.map((lines, i) => { const rg = rhymeGroups(lines); return `<p class="stanza">${lines.map((l, li) => `<span class="ln">${li === 0 && n > 1 ? `<span class="snum">${i + 1}.</span>` : ''}${rhymeLine(l, rg[li])}</span>`).join('')}</p>`; }).join('')}</div></div>
+      <div class="sheet"><div class="poem">${stz.map((lines, i) => { const rg = rhymeGroups(lines); return `<p class="stanza">${lines.map((l, li) => `<span class="ln">${li === 0 && n > 1 ? `<span class="snum">${i + 1}.</span>` : ''}${rhymeLine(l, rg[li], hasGloss)}</span>`).join('')}${stanzaAbout(i) ? `<span class="ln"><button class="aboutbtn" data-about="${i}">Miről szól?</button></span>` : ''}</p>`; }).join('')}</div></div>
     </details>`;
   app.querySelector('#back').onclick = () => go('home');
   app.querySelector('#edit').onclick = () => go('edit', { id });
@@ -1069,6 +1072,9 @@ VIEWS.settings = () => {
     <p class="label">Róka a feladatoknál</p>
     <div class="chips" id="buddy"><button class="chip" data-v="1" aria-pressed="${set.buddy !== false}">Be</button><button class="chip" data-v="0" aria-pressed="${set.buddy === false}">Ki</button></div>
     <p class="muted small" style="margin:0">A róka felolvas, figyel, amikor elmondod neki a sort, és reagál a válaszaidra.</p>
+    <p class="label">A róka mikrofonnal ellenőrizzen?</p>
+    <div class="chips" id="lmic"><button class="chip" data-v="0" aria-pressed="${set.lessonMic !== true}">Nem (ajánlott)</button><button class="chip" data-v="1" aria-pressed="${set.lessonMic === true}">Igen</button></div>
+    <p class="muted small" style="margin:0">Mikrofon nélkül a gyerek elmondja a sort és a Kész gombbal lép tovább, a róka pedig elmondja a helyeset. Mikrofonnal a róka meghallgatja, de telefonon ilyenkor soronként pittyenhet és halkulhat a hang.</p>
     <p class="label">Vers háttere</p>
     <div class="chips" id="paper"><button class="chip" data-v="0" aria-pressed="${!set.paper}">Sötét</button><button class="chip" data-v="1" aria-pressed="${!!set.paper}">Papír (legjobban olvasható)</button></div>
     <p class="muted small" style="margin:0">A rímelő sorvégek színesek és aláhúzottak, az éppen olvasott sor zöld: ez segít megjegyezni.</p>
@@ -1092,6 +1098,7 @@ VIEWS.settings = () => {
   app.querySelectorAll('#size .chip').forEach(b => b.onclick = () => { S.setSize(+b.dataset.v); VIEWS.settings(); });
   app.querySelectorAll('#world .chip').forEach(b => b.onclick = () => { setWorld(b.dataset.v); VIEWS.settings(); });
   app.querySelector('#credits').onclick = () => go('credits');
+  app.querySelectorAll('#lmic .chip').forEach(b => b.onclick = () => { set.lessonMic = b.dataset.v === '1'; S.save(); VIEWS.settings(); });
   app.querySelectorAll('#buddy .chip').forEach(b => b.onclick = () => { set.buddy = b.dataset.v === '1'; S.save(); VIEWS.settings(); });
   app.querySelectorAll('#paper .chip').forEach(b => b.onclick = () => { set.paper = b.dataset.v === '1'; S.save(); document.documentElement.dataset.paper = set.paper ? '1' : '0'; VIEWS.settings(); });
   app.querySelectorAll('#memeOn .chip').forEach(b => b.onclick = () => { MM.setMemes(b.dataset.v === '1'); VIEWS.settings(); });
@@ -1135,5 +1142,29 @@ document.documentElement.dataset.paper = S.state.settings.paper ? '1' : '0';
 S.save();
 loadAudioIndex();
 loadScenes();
+loadGloss();
+// szómagyarázat: bárhol a pontozottan aláhúzott szóra koppintva
+function showGloss(w) {
+  const g = glossOf(w); if (!g) return;
+  document.querySelector('.glosscard')?.remove();
+  const c = document.createElement('div'); c.className = 'glosscard'; c.setAttribute('role', 'status');
+  c.innerHTML = `<b>${esc(w)}</b><span>${esc(g.t)}</span>`;
+  document.body.appendChild(c); setTimeout(() => c.remove(), 7000);
+  c.onclick = () => c.remove();
+  if (petApi) petSayUrl(`voice/gloss/${P.pet().g || 'm'}/${g.h}.mp3`);
+}
+function showAbout(i) {
+  const a = stanzaAbout(i); if (!a) return;
+  document.querySelector('.glosscard')?.remove();
+  const c = document.createElement('div'); c.className = 'glosscard'; c.setAttribute('role', 'status');
+  c.innerHTML = `<b>${i + 1}. versszak</b><span>${esc(a.t)}</span>`;
+  document.body.appendChild(c); setTimeout(() => c.remove(), 8000);
+  c.onclick = () => c.remove();
+  if (petApi) petSayUrl(`voice/gloss/${P.pet().g || 'm'}/${a.h}.mp3`);
+}
+document.addEventListener('click', e => {
+  const g = e.target.closest('.gl'); if (g) { e.stopPropagation(); showGloss(g.dataset.g); return; }
+  const ab = e.target.closest('[data-about]'); if (ab) showAbout(+ab.dataset.about);
+}, true);
 go('home', {}, false);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

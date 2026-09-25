@@ -684,3 +684,17 @@ img.tc-img.sil{filter:brightness(0) opacity(.45);background:none}
 .lline .turn.fox{background:#FFB547}
 .lessonpanel .row .btn{min-height:52px}
 .lessonpanel .btn.go{font-size:1.2rem;min-height:56px}
+
+/* ===== szómagyarázat ===== */
+.gl{text-decoration:underline dotted;text-decoration-thickness:2px;text-underline-offset:5px;text-decoration-color:rgba(255,200,61,.8);cursor:help}
+.gl:focus-visible{outline:2px solid var(--gold);border-radius:4px}
+:root[data-paper="1"] .gl{text-decoration-color:#B87A0A}
+.glosscard{position:fixed;left:0;right:0;margin-inline:auto;bottom:calc(150px + env(safe-area-inset-bottom,0px));z-index:50;width:min(420px,calc(100% - 32px));
+  display:flex;flex-direction:column;gap:4px;background:#FFF8E6;color:#2A1D05;border-radius:18px;padding:12px 16px;box-shadow:0 16px 40px -12px rgba(0,0,0,.7);border:2px solid #FFC83D}
+.glosscard b{font-family:var(--poem);font-size:1.2rem}
+.glosscard span{font-size:.98rem;line-height:1.4}
+@media (prefers-reduced-motion:no-preference){.glosscard{animation:tpop .3s ease-out}}
+.aboutbtn{border:1px solid var(--glass-brd);background:var(--glass);color:var(--gold);border-radius:10px;padding:2px 10px;font:600 .82rem var(--ui);cursor:pointer}
+
+/* a "Következő lépés" kártya gombja ne kapjon üveg-hátteret (az elnyomta a színét) */
+.next .btn:not(.primary):not(.go):not(.good):not(.ghost){background:var(--pen);border-color:var(--pen);color:var(--pen-ink);box-shadow:0 5px 0 #7FA81F;-webkit-backdrop-filter:none;backdrop-filter:none}

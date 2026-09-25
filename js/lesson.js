@@ -1,7 +1,8 @@
 // "Tanuljunk együtt": beszélgetős tanulás a nagy rókával.
 // 1. Mondd utánam  2. Folytasd (felváltva)  3. Egyedül. A róka felolvas, figyel, ellenőriz, dicsér.
-import { parseStanzas, esc, words, matchSpoken } from './text.js?v=32';
-import { lineScene, lineImages } from './imagery.js?v=32';
+import { parseStanzas, esc, words, matchSpoken, rhymeLine } from './text.js?v=35';
+import { lineScene, lineImages } from './imagery.js?v=35';
+import { hasGloss } from './gloss.js?v=35';
 
 const LEVELS = { echo: 'Mondd utánam', alt: 'Folytasd', solo: 'Egyedül' };
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -50,7 +51,10 @@ export function mountLesson(deps) {
   }
 
   // ---------- hallgatás: beszédfelismerés, vagy ha az nincs, hangerő alapján ----------
+  // mikrofon csak ha a beállításokban kérték (a folyamatos be-kikapcsolás telefonon pittyeg és lehalkítja a hangot)
+  const micOn = () => !!deps.useMic;
   async function micReady() {
+    if (!micOn()) return true;
     if (SR || stream) return true;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
@@ -63,6 +67,13 @@ export function mountLesson(deps) {
   const lvl = () => { micAn.getFloatTimeDomainData(buf); let s = 0; for (const v of buf) s += v * v; return Math.sqrt(s / buf.length); };
   function listen(expected, myRun) {
     return new Promise(resolve => {
+      if (!micOn()) {
+        // mikrofon nélkül: a gyerek elmondja, aztán "Kész" (vagy magától továbblép, ha letelt a sor ideje)
+        const est = 1800 + words(expected).length * 550;
+        const tm = setTimeout(() => resolve({ spoke: true }), est * 1.6);
+        manualDone = () => { clearTimeout(tm); resolve({ spoke: true }); };
+        return;
+      }
       if (SR) {
         const r = new SR(); r.lang = 'hu-HU'; r.maxAlternatives = 3; r.interimResults = false;
         let best = null, pressed = false;
@@ -95,7 +106,7 @@ export function mountLesson(deps) {
     pet()?.setFocus?.(true);
     const lines = curLines();
     const alive = () => my === runId;
-    if (!(await micReady())) deps.toast('Mikrofon nélkül a "Kész" gombbal jelezd, ha elmondtad.');
+    if (micOn() && !(await micReady())) deps.toast('Nincs mikrofon: a "Kész" gombbal jelezd, ha elmondtad.');
     states = lines.map(() => level === 'echo' ? 'show' : 'hide'); cur = -1; draw();
     // melyik sort ki mondja: 'fox' / 'kid'
     let turns;
@@ -151,7 +162,7 @@ export function mountLesson(deps) {
   // ---------- megjelenítés ----------
   function lineHTML(l, i) {
     const st = states[i] || 'show', active = i === cur;
-    const text = st === 'hide' && !(active && who === 'fox') ? words(l).map(w => '<span class="mask">' + '·'.repeat(Math.min(6, w.length)) + '</span>').join(' ') : esc(l);
+    const text = st === 'hide' && !(active && who === 'fox') ? words(l).map(w => '<span class="mask">' + '·'.repeat(Math.min(6, w.length)) + '</span>').join(' ') : rhymeLine(l, -1, hasGloss);
     return `<div class="lline ${active ? 'cur ' + who : ''} ${st}">${active && who === 'kid' ? '<span class="turn">Te</span>' : active ? '<span class="turn fox">Róka</span>' : ''}<span class="lt">${text}</span></div>`;
   }
   function draw() {
@@ -166,12 +177,13 @@ export function mountLesson(deps) {
       <div class="row">
         ${running
           ? `${who === 'kid' ? `<button class="btn go px grow" id="ldone">Kész, mondtam</button><button class="btn grow" id="lskip">Nem tudom</button><button class="btn" id="lhint">💭</button>` : `<span class="grow muted small" style="text-align:center">A róka beszél…</span>`}<button class="btn" id="lstop" aria-label="Megállítás">✕</button>`
-          : `<button class="btn go px grow" id="lstart">${task ? esc(task.label || LEVELS[level]) : `${LEVELS[level]} · ${si + 1}. versszak`}</button><button class="btn" id="lexit">Vissza</button>`}
+          : `<button class="btn go px grow" id="lstart">${task ? esc(task.label || LEVELS[level]) : `${LEVELS[level]} · ${si + 1}. versszak`}</button><button class="btn" id="lwhat">Miről szól?</button><button class="btn" id="lexit">Vissza</button>`}
       </div>`;
     root.querySelectorAll('[data-si]').forEach(b => b.onclick = () => { si = +b.dataset.si; states = []; draw(); });
     root.querySelectorAll('[data-lv]').forEach(b => b.onclick = () => { level = b.dataset.lv; states = []; draw(); });
     root.querySelector('#lstart')?.addEventListener('click', () => { pet()?.audio(); run(); });
     root.querySelector('#lexit')?.addEventListener('click', () => { stop(); deps.onExit?.(); });
+    root.querySelector('#lwhat')?.addEventListener('click', () => deps.about?.(task ? task.stanzas[0] : si));
     root.querySelector('#lstop')?.addEventListener('click', stop);
     root.querySelector('#ldone')?.addEventListener('click', () => manualDone?.());
     root.querySelector('#lskip')?.addEventListener('click', () => { manualSkip = true; manualDone?.(); });
