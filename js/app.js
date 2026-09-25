@@ -80,62 +80,60 @@ function ctxFor(poem) {
 // ================= Nézetek =================
 const VIEWS = {};
 
-function levelHTML() {
-  const L = G.levelInfo();
-  return `<div class="lvl">
-    <span class="lvbadge px">${L.lvl}</span>
-    <div class="grow"><div class="row" style="justify-content:space-between;gap:6px"><b class="px">${L.name}</b><span class="small muted px">${L.cur} / ${L.need} XP</span></div>
-    <div class="xpbar"><i style="width:${Math.round(L.frac * 100)}%"></i></div></div>
-  </div>`;
-}
-
 VIEWS.home = () => {
   const poems = S.state.poems;
   const last = S.getPoem(S.state.lastPoem) || poems[0];
   const lastTask = last && S.nextTask(last);
   const m = G.missionToday();
-  const bp = G.buildProgress(), W = G.world();
+  const bp = G.buildProgress(), W = G.world(), L = G.levelInfo();
+  const world = S.state.settings.world;
+  const badgeCount = S.state.game.badges.length;
   app.innerHTML = `
-    <div class="top"><h1 class="brand grow">Fejből</h1>
-      ${S.streak() ? `<span class="streak px" title="nap egymás után">${S.streak()} napos sorozat</span>` : ''}
-      <button class="icon-btn" id="settings" aria-label="Beállítások">${I.gear}</button></div>
-    ${levelHTML()}
-    <section class="mission ${m.claimed ? 'claimed' : ''}">
-      <div class="row" style="justify-content:space-between"><p class="label">Napi küldetés</p><span class="px">${m.done}/${G.MISSION_SIZE}</span></div>
-      <div class="mslots">${Array.from({ length: G.MISSION_SIZE }, (_, i) => `<span class="${i < m.done ? 'on' : ''}"></span>`).join('')}<span class="chest ${m.claimed ? 'open' : ''}" aria-hidden="true"></span></div>
-      <h2 class="px">${m.claimed ? 'Mára kész. Láda kinyitva.' : m.done ? `Még ${G.MISSION_SIZE - m.done}, és nyílik a láda` : '3 feladat · kb. 5 perc'}</h2>
-      ${last ? `<button class="btn big wide px ${m.claimed ? '' : 'primary'}" id="cont">${m.claimed ? 'Még egy kör' : m.done ? 'Folytatás' : 'Indulás'}</button>` : ''}
-      ${last && lastTask ? `<p class="small muted" style="margin:0">Következik: ${esc(last.title)} · ${esc(taskText(last, lastTask).title)}</p>` : ''}
+    <div class="top">
+      <h1 class="brand grow">Fejből</h1>
+      <button class="rank" id="rank" aria-label="Rang és jelvények">
+        <span class="lvbadge px">${L.lvl}</span>
+        <span class="rk"><b class="px">${L.name}</b><i class="xpbar"><i style="width:${Math.round(L.frac * 100)}%"></i></i></span>
+      </button>
+      <button class="icon-btn" id="settings" aria-label="Beállítások">${I.gear}</button>
+    </div>
+    ${world ? `<section class="hero ${m.claimed ? 'claimed' : ''}">
+      <div class="hero-vis"><canvas id="build" aria-label="${esc(W.label(bp.stage))}: ${bp.placed} / ${bp.size} ${W.unit}"></canvas>
+        <span class="hero-tag px">${esc(bp.stage.name)} · ${bp.placed}/${bp.size} ${W.unit}</span></div>
+      <div class="hero-body">
+        <div class="mrow">
+          <div class="mdots">${Array.from({ length: G.MISSION_SIZE }, (_, i) => `<span class="${i < m.done ? 'on' : ''}"></span>`).join('')}</div>
+          <span class="small muted">${m.claimed ? 'Napi küldetés kész' : `Napi küldetés ${m.done}/${G.MISSION_SIZE}`}</span>
+          ${S.streak() > 1 ? `<span class="streak px">${S.streak()} nap</span>` : ''}
+        </div>
+        ${last ? `<button class="btn go px" id="cont">${m.claimed ? 'Még egy kör' : m.done ? 'Folytatás' : 'Indulás'}</button>` : ''}
+        ${last && lastTask ? `<p class="small muted nexttask">${esc(taskText(last, lastTask).title)}</p>` : ''}
+      </div>
     </section>
-    ${S.state.settings.world ? `<section class="buildcard">
-      <div class="row" style="justify-content:space-between"><p class="label">${esc(W.label(bp.stage))}</p><span class="px small">${bp.placed} / ${bp.size} ${W.unit}</span></div>
-      <canvas id="build" aria-label="${esc(W.label(bp.stage))}: ${bp.placed} / ${bp.size} ${W.unit}"></canvas>
-      <p class="small muted" style="margin:0">${W.hint}</p>
-      ${S.state.settings.world === 'car' ? `<button class="btn wide px" id="garage">Garázs · ${G.carsUnlocked()} / ${G.CARS.length} autó</button>` : ''}
-    </section>` : worldPickerHTML()}
-    <p class="label">Verseim</p>
+    <nav class="quick">
+      ${world === 'car' ? `<button class="qbtn" id="garage"><b class="px">Garázs</b><span>${G.carsUnlocked()}/${G.CARS.length} autó</span></button>` : ''}
+      <button class="qbtn" id="speed"><b class="px">Speedrun</b><span>${last?.best ? `rekord: ${last.best}` : '60 mp'}</span></button>
+      <button class="qbtn" id="badges"><b class="px">Jelvények</b><span>${badgeCount}/${G.BADGES.length}</span></button>
+    </nav>` : worldPickerHTML()}
+    <div class="row" style="justify-content:space-between"><p class="label">Verseim</p><button class="btn ghost small" id="add">+ Új vers</button></div>
     <div class="cards">${poems.map(p => {
       const s = poemSummary(p);
       return `<button class="pcard" data-id="${p.id}">
-        <h3>${esc(p.title)}</h3>${p.author ? `<span class="by">${esc(p.author)}</span>` : ''}
+        <div class="row" style="justify-content:space-between;align-items:baseline"><h3>${esc(p.title)}</h3><span class="px small muted">${s.done}/${s.total}</span></div>
         ${segsHTML(p)}
-        <span class="meta"><span>${s.done} / ${s.total} versszak megy</span>${s.due ? `<span class="due">${s.due} ismétlésre vár</span>` : ''}${p.best ? `<span>Villámkör rekord: ${p.best}</span>` : ''}</span>
+        ${s.due ? `<span class="meta"><span class="due">${s.due} versszak ismétlésre vár</span></span>` : ''}
       </button>`;
-    }).join('')}</div>
-    <button class="btn big wide" id="add">+ Új vers</button>
-    <p class="label">Jelvények</p>
-    <div class="badges">${G.BADGES.map(b => {
-      const on = S.state.game.badges.includes(b.id); b = G.badgeInfo(b);
-      return `<div class="badge ${on ? 'on' : ''}" title="${esc(b.desc)}"><span class="bico px" style="--bc:${b.color}">${b.glyph}</span><b>${esc(b.name)}</b><span>${esc(b.desc)}</span></div>`;
-    }).join('')}</div>
-    <p class="foot">A haladásod ezen a telefonon tárolódik.</p>`;
+    }).join('')}</div>`;
   requestAnimationFrame(() => {
     const c = app.querySelector('#build'); if (c) G.drawProgress(c, bp);
     app.querySelectorAll('canvas[data-world]').forEach(cv => { const w = G.WORLDS[cv.dataset.world]; G.drawProgress(cv, G.buildProgress(Math.max(S.state.game.blocks, 14), w), 0, w); });
   });
   app.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { setWorld(b.dataset.pick); G.sfx('win'); VIEWS.home(); });
   app.querySelector('#settings').onclick = () => go('settings');
+  app.querySelector('#rank').onclick = () => go('badges');
+  app.querySelector('#badges')?.addEventListener('click', () => go('badges'));
   app.querySelector('#garage')?.addEventListener('click', () => go('garage'));
+  app.querySelector('#speed')?.addEventListener('click', () => last && startTask(last, blitzTask(last, -1)));
   app.querySelector('#add').onclick = () => go('add');
   app.querySelector('#cont')?.addEventListener('click', () => {
     G.sfx('block');
@@ -143,6 +141,26 @@ VIEWS.home = () => {
     else startTask(last, blitzTask(last, -1));
   });
   app.querySelectorAll('.pcard').forEach(b => b.onclick = () => go('poem', { id: b.dataset.id }));
+};
+
+VIEWS.badges = () => {
+  const L = G.levelInfo();
+  app.innerHTML = `
+    <div class="top">
+      <button class="icon-btn" id="back" aria-label="Vissza">${I.back}</button>
+      <h1 class="t grow px">Rang és jelvények</h1>
+    </div>
+    <section class="rankcard">
+      <span class="lvbadge px">${L.lvl}</span>
+      <div class="grow"><b class="px" style="font-size:1.6rem">${L.name}</b>
+        <div class="xpbar"><i style="width:${Math.round(L.frac * 100)}%"></i></div>
+        <span class="small muted">${L.cur} / ${L.need} XP a következő rangig</span></div>
+    </section>
+    <div class="badges">${G.BADGES.map(b => {
+      const on = S.state.game.badges.includes(b.id); b = G.badgeInfo(b);
+      return `<div class="badge ${on ? 'on' : ''}"><span class="bico px" style="--bc:${b.color}">${b.glyph}</span><b>${esc(b.name)}</b><span>${esc(b.desc)}</span></div>`;
+    }).join('')}</div>`;
+  app.querySelector('#back').onclick = back;
 };
 
 function worldPickerHTML() {

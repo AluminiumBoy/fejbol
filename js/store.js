@@ -5,7 +5,9 @@ const KEY = 'fejbol.v3';
 const DAY = 864e5;
 
 // Minden versszak ezen a lépcsőn megy végig. Az utolsó a fejből felmondás.
-export const PATH = ['listen', 'rhyme', 'cloze', 'order', 'words', 'hide', 'initials', 'recall'];
+export const PATH = ['listen', 'cloze', 'initials', 'recall'];
+// korábbi, hosszabb út: a haladást átszámoljuk az újra
+const OLD_PATH = ['listen', 'rhyme', 'cloze', 'order', 'words', 'hide', 'initials', 'recall'];
 // Ismétlések közti napok egy megtanult versszaknál
 const INTERVALS = [1, 2, 4, 7, 14, 30];
 export const PASS = 0.8;
@@ -73,7 +75,7 @@ function load() {
   let s = null;
   try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
   if (s && Array.isArray(s.poems)) return withGame(s);
-  s = { poems: [], days: {}, settings: { size: 0 } };
+  s = { poems: [], days: {}, settings: { size: 0 }, pathV: 2 };
   // korábbi (egyszerű) változat verseinek átvétele
   try {
     const old = JSON.parse(localStorage.getItem('fejbol.v2'));
@@ -83,7 +85,19 @@ function load() {
   return withGame(s);
 }
 
+function migratePath(s) {
+  if (s.pathV === 2) return;
+  for (const p of s.poems) for (const st of p.stanzas || []) {
+    if (st.step >= OLD_PATH.length) { st.step = PATH.length; continue; }
+    // az első olyan új lépés, ami a régi úton még hátravolt
+    const k = PATH.findIndex(t => OLD_PATH.indexOf(t) >= st.step);
+    st.step = k < 0 ? PATH.length : k;
+  }
+  s.pathV = 2;
+}
+
 function withGame(s) {
+  migratePath(s);
   s.game = Object.assign({ xp: 0, blocks: 0, tasks: 0, perfect: 0, missionsDone: 0, badges: [], mission: { day: '', done: 0, claimed: false } }, s.game || {});
   return s;
 }
