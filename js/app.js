@@ -1,14 +1,14 @@
-import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=43';
-import * as S from './store.js?v=43';
-import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=43';
-import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=43';
-import * as G from './game.js?v=43';
-import * as SH from './shop.js?v=43';
-import * as MM from './memes.js?v=43';
-import * as CD from './cards.js?v=43';
-import * as P from './pet.js?v=43';
-import { lineImages, lineScene, loadScenes } from './imagery.js?v=43';
-import { loadGloss, glossOf, hasGloss, stanzaAbout } from './gloss.js?v=43';
+import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=45';
+import * as S from './store.js?v=45';
+import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=45';
+import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=45';
+import * as G from './game.js?v=45';
+import * as SH from './shop.js?v=45';
+import * as MM from './memes.js?v=45';
+import * as CD from './cards.js?v=45';
+import * as P from './pet.js?v=45';
+import { lineImages, lineScene, loadScenes } from './imagery.js?v=45';
+import { loadGloss, glossOf, hasGloss, stanzaAbout } from './gloss.js?v=45';
 
 const app = document.getElementById('app');
 const I = {
@@ -454,11 +454,11 @@ function petHeroHTML(bp) {
   </div>`;
 }
 let petApi = null, petVoices = new Map(), bubbleTimer;
-async function loadPet(canvas, frame) {
-  const mod = await import('./pet3d.js?v=43');
+async function loadPet(canvas, frame, extra = {}) {
+  const mod = await import('./pet3d.js?v=45');
   const p = P.pet();
   const seen = Math.min(p.seen ?? petStage(), petStage());
-  const api = await mod.mountPet(canvas, { frame, gender: p.g || 'm', stage: seen, hungry: P.hungry(), onTap: () => petTap() });
+  const api = await mod.mountPet(canvas, { frame, gender: p.g || 'm', stage: seen, hungry: P.hungry(), onTap: () => petTap(), ...extra });
   petVoices = new Map();
   cleanups.push(() => { api.dispose(); if (petApi === api) petApi = null; });
   petApi = api;
@@ -529,6 +529,102 @@ VIEWS.petpick = () => {
   app.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { P.setGender(b.dataset.g); P.giveSnacks(P.pet().snacks ? 0 : 1); G.sfx('win'); go('home', {}, false); });
 };
 
+// ---------- Memóriapalota: minden versszaknak megvan a helye a szobában (útvonal-módszer) ----------
+let lineIdxCache = null;
+async function lineAudioBuf(l, voice) {
+  if (!lineIdxCache) { try { lineIdxCache = await (await fetch('audio/lines/index.json')).json(); } catch (e) { lineIdxCache = { lines: {} }; } }
+  const h = lineIdxCache.lines?.[l]; if (!h || !petApi) return null;
+  try { return await petApi.audio().decodeAudioData(await (await fetch(`audio/lines/${voice}/${h}.mp3`)).arrayBuffer()); } catch (e) { return null; }
+}
+VIEWS.palace = ({ id }) => {
+  const poem = S.getPoem(id) || S.state.poems[0]; if (!poem) return go('home', {}, false);
+  const stz = parseStanzas(poem.text), voice = P.pet().g === 'f' ? 'noemi' : 'tamas';
+  const stations = stz.map(lines => ({ icon: lineImages(lines[0])[0] || '✨' }));
+  let mode = 'walk', cur = -1, busy = false, results = [];
+  app.innerHTML = `
+    <div class="petfull">
+      <canvas id="petcv" class="petcv full"></canvas>
+      <div class="pethud">
+        <button class="icon-btn" id="back" aria-label="Vissza">${I.back}</button>
+        <b class="px grow" style="font-size:1.5rem">Memóriapalota</b>
+        <span class="px muted" id="pcount"></span>
+      </div>
+      <div class="pbubble off" id="pbubble"></div>
+      <div class="petdock" id="pdock">
+        <div class="chips" style="justify-content:center" id="pmode">
+          <button class="chip" data-m="walk" aria-pressed="true">Séta</button>
+          <button class="chip" data-m="recall" aria-pressed="false">Felidézés</button>
+        </div>
+        <div class="row" id="pbtns"></div>
+        <p class="muted small" style="margin:0;text-align:center" id="phint">Koppints egy helyre a szobában, vagy menj sorban.</p>
+      </div>
+    </div>`;
+  app.querySelector('#back').onclick = back;
+  const say = (t, k, ms) => petSay(t, k, ms);
+  const sayKey = async (k, t) => { say(t, null, 2800); await new Promise(r => setTimeout(r, 200)); const b = await lineAudioBufKey(k); if (b) await petApi.speak(b); };
+  const lineAudioBufKey = async k => { try { return await petApi.audio().decodeAudioData(await (await fetch(`voice/${P.pet().g || 'm'}/${k}.mp3`)).arrayBuffer()); } catch (e) { return null; } };
+  const btns = html => { const b = app.querySelector('#pbtns'); if (b) b.innerHTML = html; };
+  const count = () => { const c = app.querySelector('#pcount'); if (c) c.textContent = mode === 'recall' ? `${results.filter(Boolean).length} / ${stz.length}` : cur >= 0 ? `${cur + 1} / ${stz.length}` : ''; };
+
+  // séta: a róka odamegy, elmondja a hely jelenetét, aztán a versszak első sorát
+  async function visit(i) {
+    if (busy || !petApi) return; busy = true; cur = i; count();
+    btns('');
+    await petApi.walkTo(i);
+    const first = stz[i][0], sc = lineScene(first);
+    petApi.showIcon(i, true);
+    if (mode === 'walk') {
+      if (sc) { say(sc.t, null, 7000); petSayUrl(`voice/scenes/${P.pet().g || 'm'}/${sc.h}.mp3`); await new Promise(r => setTimeout(r, 4500)); }
+      const b = await lineAudioBuf(first, voice); if (b) { say(first, null, 3500); await petApi.speak(b); }
+      busy = false;
+      btns(i + 1 < stz.length ? `<button class="btn go px grow" id="nxt">Tovább</button>` : `<button class="btn go px grow" id="torecall">Kész! Próbáld felidézni</button>`);
+      app.querySelector('#nxt')?.addEventListener('click', () => visit(i + 1));
+      app.querySelector('#torecall')?.addEventListener('click', () => { setMode('recall'); });
+    } else {
+      petApi.showIcon(i, false);
+      await sayKey('palace_ask', 'Mi történik itt? Melyik versszak ez?');
+      petApi.setListening(true);
+      busy = false;
+      btns(`<button class="btn go px grow" id="knew">Tudtam</button><button class="btn grow" id="reveal">Megnézem</button>`);
+      const finish = async ok => {
+        petApi.setListening(false); btns('');
+        results[i] = ok; petApi.markStation(i, ok); petApi.showIcon(i, true);
+        S.recordLine(poem, i, 0, ok);
+        if (!ok) { if (sc) { say(sc.t, null, 6000); petSayUrl(`voice/scenes/${P.pet().g || 'm'}/${sc.h}.mp3`); await new Promise(r => setTimeout(r, 4200)); } const b = await lineAudioBuf(first, voice); if (b) { say(first, null, 3500); await petApi.speak(b); } }
+        else { petApi.react('good'); const b = await lineAudioBuf(first, voice); if (b) { say(first, null, 3000); await petApi.speak(b); } }
+        count();
+        const left = stz.map((_, k) => k).filter(k => results[k] == null);
+        if (!left.length) {
+          const good = results.filter(Boolean).length, score = good / stz.length;
+          const r = S.applyResult(poem, { type: 'recall', stanzas: stz.map((_, k) => k), kind: 'free' }, score);
+          const rw = G.reward({ task: { type: 'recall', stanzas: [0], kind: 'free' }, score, poem, ...r });
+          if (score >= .8) P.giveSnacks(1);
+          toast(`${good} / ${stz.length} helyet tudtál · +${rw.xp} XP${score >= .8 ? ' · +1 falat' : ''}`);
+          petApi.react(score >= .8 ? 'great' : 'good');
+          await sayKey('palace_recall_done', 'Ügyes! A helyek segítenek emlékezni.');
+          btns(`<button class="btn go px grow" id="again">Még egyszer</button>`);
+          app.querySelector('#again')?.addEventListener('click', () => setMode('recall'));
+        } else btns(`<button class="btn go px grow" id="nxt">Következő hely</button>`), app.querySelector('#nxt')?.addEventListener('click', () => visit(left[0]));
+      };
+      app.querySelector('#knew').onclick = () => finish(true);
+      app.querySelector('#reveal').onclick = () => finish(false);
+    }
+  }
+  function setMode(m) {
+    mode = m; results = []; cur = -1; count();
+    app.querySelectorAll('#pmode .chip').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === m));
+    stz.forEach((_, i) => { petApi?.showIcon(i, m === 'walk'); petApi?.markStation(i, null); });
+    app.querySelector('#phint').textContent = m === 'walk' ? 'A róka végigvezet: minden versszaknak megvan a helye.' : 'A képek eltűntek. Emlékszel, mi van az egyes helyeken?';
+    btns(`<button class="btn go px grow" id="start">${m === 'walk' ? 'Induljunk' : 'Kezdjük a felidézést'}</button>`);
+    app.querySelector('#start').onclick = () => visit(0);
+  }
+  app.querySelectorAll('#pmode .chip').forEach(b => b.onclick = () => { if (!busy) setMode(b.dataset.m); });
+  loadPet(app.querySelector('#petcv'), 'palace', { stations, onStation: i => { if (!busy) visit(i); } }).then(async () => {
+    setMode('walk');
+    await sayKey('palace_intro', 'Ez a memóriapalotánk! Minden versszaknak megvan a helye. Sétáljunk végig!');
+  }).catch(() => say('A palota betöltéséhez internet kell.'));
+};
+
 VIEWS.pet = ({ learn, exam } = {}) => {
   const p = P.pet();
   app.innerHTML = `
@@ -543,7 +639,7 @@ VIEWS.pet = ({ learn, exam } = {}) => {
       <div class="petdock lessonpanel" id="lesson" hidden></div>
       <div class="petdock" id="pdock">
         <button class="btn go px together" id="together">Tanuljunk együtt</button>
-        <button class="btn examopen" id="examgo">Felelés-próba</button>
+        <div class="row"><button class="btn examopen grow" id="examgo">Felelés-próba</button><button class="btn examopen grow" id="palacego">Memóriapalota</button></div>
         <button class="btn go px" id="talk">Beszélj hozzá</button>
         <div class="row">
           <button class="btn grow" id="feed"><img src="img/drumstick.png" alt="" width="24">Etetés · <span id="sn">${p.snacks}</span></button>
@@ -606,7 +702,7 @@ VIEWS.pet = ({ learn, exam } = {}) => {
   const openLesson = async (learnTask) => {
     if (!petApi) return;
     stopMic();
-    const { mountLesson } = await import('./lesson.js?v=43');
+    const { mountLesson } = await import('./lesson.js?v=45');
     const panel = app.querySelector('#lesson'), dock = app.querySelector('#pdock');
     dock.hidden = true; panel.hidden = false;
     const poem = (learnTask && S.getPoem(learn.id)) || S.getPoem(S.state.lastPoem) || S.state.poems[0];
@@ -657,7 +753,7 @@ VIEWS.pet = ({ learn, exam } = {}) => {
   const openExam = async (id) => {
     if (!petApi) return;
     stopMic();
-    const { mountExam } = await import('./exam.js?v=43');
+    const { mountExam } = await import('./exam.js?v=45');
     const panel = app.querySelector('#lesson'), dock = app.querySelector('#pdock');
     dock.hidden = true; panel.hidden = false;
     const poem = S.getPoem(id || S.state.lastPoem) || S.state.poems[0];
@@ -677,6 +773,7 @@ VIEWS.pet = ({ learn, exam } = {}) => {
     });
   };
   app.querySelector('#examgo').onclick = () => openExam(null);
+  app.querySelector('#palacego').onclick = () => go('palace', { id: (S.getPoem(S.state.lastPoem) || S.state.poems[0]).id });
   app.querySelector('#swap').onclick = () => { P.setGender(P.pet().g === 'f' ? 'm' : 'f'); petVoices = new Map(); petApi?.setGender(P.pet().g); VIEWS.pet(); };
   loadPet(app.querySelector('#petcv'), 'full').then(() => {
     if (learn) { S.state.lastPoem = learn.id; openLesson(learn.task); return; }
@@ -783,6 +880,7 @@ VIEWS.poem = ({ id, scope = -1 }) => {
 const LESSON_TYPES = ['echo', 'alt', 'solo', 'fix'];
 function startTask(poem, task) {
   if (task.type === 'exam') { if (!P.pet().g) P.setGender('m'); go('pet', { exam: { id: poem.id } }); return; }
+  if (task.type === 'palace') { if (!P.pet().g) P.setGender('m'); go('palace', { id: poem.id }); return; }
   if (LESSON_TYPES.includes(task.type)) { if (!P.pet().g) P.setGender('m'); go('pet', { learn: { id: poem.id, task } }); }
   else go('exercise', { id: poem.id, task });
 }

@@ -2,9 +2,9 @@
 //   ui  = { body, dock, progress(0..1), finish(score), cleanup(fn), toast(msg) }
 //   set = [{ i: versszak sorszáma, lines: [...] }]
 //   ctx = { allWords: a vers összes szava (tippekhez) }
-import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=43';
-import { lineImages, lineScene, hasHint } from './imagery.js?v=43';
-import { hasGloss } from './gloss.js?v=43';
+import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=45';
+import { lineImages, lineScene, hasHint } from './imagery.js?v=45';
+import { hasGloss } from './gloss.js?v=45';
 
 export const EXERCISES = {
   listen:   { name: 'Meghallgatás', short: 'Hallgasd meg és olvasd fel', help: 'Hallgasd meg, aztán olvasd fel hangosan te is.', icon: 'M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4' },
@@ -19,6 +19,7 @@ export const EXERCISES = {
   alt:      { name: 'Folytasd', short: 'Felváltva a rókával', help: 'Felváltva mondjátok: egy sor a rókáé, a következő a tiéd.', icon: 'M7 7h10M7 12h6M7 17h10' },
   fix:      { name: 'Gyenge pontok', short: 'Ami még nem megy', help: 'Csak azokat a sorokat gyakoroljuk, amik még elakadnak.', icon: 'M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z', hidden: true },
   solo:     { name: 'Egyedül', short: 'Fejből, a róka figyel', help: 'Mondd el fejből, a róka figyel és ellenőriz.', icon: 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3' },
+  palace:   { name: 'Memóriapalota', short: 'Minden versszaknak helye van', help: 'Sétálj végig a szobán a rókával: a helyek segítenek emlékezni.', icon: 'M3 21V9l9-6 9 6v12H14v-6h-4v6H3z', special: true },
   exam:     { name: 'Felelés-próba', short: 'A róka kifeleltet, jegyet ad', help: 'A róka tanárként kérdez a versből.', icon: 'M22 10L12 5 2 10l10 5 10-5zM6 12v5c3 2 9 2 12 0v-5', special: true },
   rap:      { name: 'Rap mód', short: 'Rappeld el ütemre', help: 'Szól az ütem: rappeld a verset a rókával!', icon: 'M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z', special: true },
   recall:   { name: 'Felmondás',    short: 'Fejből, soronként', help: 'Mondd el fejből a következő sort, aztán nézd meg, jó volt-e.', icon: 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3' }

@@ -99,13 +99,15 @@ export async function mountPet(canvas, opts = {}) {
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), .22, .4, .97); composer.addPass(bloom);
   composer.addPass(new OutputPass());
-  const frame = opts.frame || 'full'; // 'full' vagy 'card' (a kezdőképernyő kártyája)
+  const frame = opts.frame || 'full'; // 'full' | 'card' (kezdőképernyő) | 'mini' (feladatoknál) | 'palace' (memóriapalota)
+  let palace = null; // a szoba a róka után épül fel (lásd lent)
   function resize() {
     const w = canvas.clientWidth || 300, h = canvas.clientHeight || 300;
     renderer.setSize(w, h, false); composer.setSize(w, h);
     camera.aspect = w / h;
     if (frame === 'card') { camera.fov = 30; camera.position.set(0, 1.35, 4.6); camera.lookAt(0, .95, 0); }
     else if (frame === 'mini') { camera.fov = 30; camera.position.set(0, 1.25, 3.3); camera.lookAt(0, 1.02, 0); }
+    else if (frame === 'palace') { camera.fov = w < h ? 52 : 38; }
     else { const p = w < h; camera.fov = p ? 40 : 30; camera.position.set(0, p ? 1.55 : 1.45, p ? 5.0 : 4.4); camera.lookAt(0, 1.0, 0); }
     camera.updateProjectionMatrix();
   }
@@ -226,6 +228,53 @@ export async function mountPet(canvas, opts = {}) {
   }
   headG.add(crown);
 
+  // ---------- memóriapalota: hosszú szoba, a fal mentén állomások (bútorok), fölöttük a versszak képe ----------
+  function textSprite(draw, size = 256) {
+    const c = document.createElement('canvas'); c.width = c.height = size; draw(c.getContext('2d'), size);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false }));
+  }
+  const FURN = ['door', 'window', 'sofa', 'table', 'shelf', 'bed', 'mirror', 'plant', 'chest'];
+  function buildPalace(stations) {
+    const g = new THREE.Group(); scene.add(g);
+    const N = stations.length || 1, gap = 2.1, x0 = -(N - 1) * gap / 2;
+    const wallMat = new THREE.MeshPhysicalMaterial({ color: 0x6B3F8F, roughness: .9 }), floorMat = new THREE.MeshPhysicalMaterial({ color: 0x8A5A3C, roughness: .6, clearcoat: .3, clearcoatRoughness: .5 });
+    const W = N * gap + 8;
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(W, 12), floorMat); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; g.add(fl);
+    // padlódeszkák
+    for (let x = -W / 2; x < W / 2; x += .9) { const l = new THREE.Mesh(new THREE.PlaneGeometry(.03, 12), new THREE.MeshBasicMaterial({ color: 0x5E3A22 })); l.rotation.x = -Math.PI / 2; l.position.set(x, .002, 0); g.add(l); }
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(W, 5), wallMat); wall.position.set(0, 2.5, -2.4); wall.receiveShadow = true; g.add(wall);
+    const skirt = new THREE.Mesh(new THREE.BoxGeometry(W, .18, .08), new THREE.MeshPhysicalMaterial({ color: 0xF3E6D6, roughness: .6 })); skirt.position.set(0, .09, -2.36); g.add(skirt);
+    // szőnyeg
+    const rug = new THREE.Mesh(new THREE.PlaneGeometry(W - 4, 3.2), new THREE.MeshPhysicalMaterial({ color: 0xD97A96, roughness: .95, sheen: 1, sheenColor: 0xffffff })); rug.rotation.x = -Math.PI / 2; rug.position.set(0, .004, .6); rug.receiveShadow = true; g.add(rug);
+    const mat = c => new THREE.MeshPhysicalMaterial({ color: c, roughness: .55, clearcoat: .4, clearcoatRoughness: .4 });
+    const box = (w, h, d, c, x, y, z, parent) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; (parent || g).add(m); return m; };
+    const cyl = (r1, r2, h, c, x, y, z, parent, seg = 32) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, seg), mat(c)); m.position.set(x, y, z); m.castShadow = true; (parent || g).add(m); return m; };
+    const list = [];
+    stations.forEach((st, i) => {
+      const x = x0 + i * gap, z = -1.5, grp = new THREE.Group(); grp.position.set(x, 0, z); g.add(grp);
+      const kind = FURN[i % FURN.length];
+      if (kind === 'door') { box(1.1, 2.4, .12, 0xC77A3A, 0, 1.2, -.8, grp); box(1.3, .12, .16, 0xF3E6D6, 0, 2.46, -.8, grp); const knob = sph(.06, mat(0xFFC53D)); knob.position.set(.4, 1.15, -.7); grp.add(knob); }
+      else if (kind === 'window') { box(1.5, 1.3, .1, 0xF3E6D6, 0, 1.8, -.82, grp); const pane = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.1), new THREE.MeshBasicMaterial({ color: 0xFFD9A0 })); pane.position.set(0, 1.8, -.76); grp.add(pane); box(.05, 1.1, .04, 0xF3E6D6, 0, 1.8, -.74, grp); box(1.3, .05, .04, 0xF3E6D6, 0, 1.8, -.74, grp); const wl = new THREE.PointLight(0xffd8a0, 10, 5, 2); wl.position.set(0, 1.8, -.3); grp.add(wl); }
+      else if (kind === 'sofa') { box(1.6, .45, .8, 0x3D8BFF, 0, .32, -.3, grp); box(1.6, .6, .25, 0x3D8BFF, 0, .85, -.6, grp); box(.7, .3, .55, 0x7FB6FF, -.4, .65, -.25, grp); box(.7, .3, .55, 0x7FB6FF, .4, .65, -.25, grp); }
+      else if (kind === 'table') { cyl(.55, .55, .06, 0xC77A3A, 0, .75, -.3, grp); cyl(.06, .06, .75, 0xC77A3A, 0, .37, -.3, grp); cyl(.28, .05, .06, 0xC77A3A, 0, .03, -.3, grp); cyl(.05, .05, .5, 0xF3E6D6, 0, 1.03, -.3, grp); cyl(.28, .18, .3, 0xFFC53D, 0, 1.35, -.3, grp); const l = new THREE.PointLight(0xffd080, 6, 4, 2); l.position.set(0, 1.25, -.3); grp.add(l); }
+      else if (kind === 'shelf') { box(1.2, 2.1, .4, 0xC77A3A, 0, 1.05, -.6, grp); [.5, 1.1, 1.7].forEach(y => box(1.1, .05, .36, 0x8A5A3C, 0, y, -.6, grp)); [.5, 1.1, 1.7].forEach(y => [-.4, -.22, -.05, .14, .3].forEach((bx, k) => box(.13, .45, .3, [0xFF4D5A, 0x3DDC84, 0xFFC53D, 0x3D8BFF, 0xB04DFF][k], bx, y + .26, -.6, grp))); }
+      else if (kind === 'bed') { box(1.7, .35, 1.0, 0xF3E6D6, 0, .3, -.2, grp); box(1.7, .22, 1.0, 0x9B59D0, 0, .58, -.2, grp); box(.6, .16, .35, 0xffffff, -.45, .77, -.5, grp); box(1.7, .9, .1, 0xC77A3A, 0, .55, -.72, grp); }
+      else if (kind === 'mirror') { const fr = cyl(.7, .7, .08, 0xFFC53D, 0, 1.7, -.8, grp); fr.rotation.x = Math.PI / 2; fr.scale.y = 1; const mi = new THREE.Mesh(new THREE.CircleGeometry(.6, 48), new THREE.MeshPhysicalMaterial({ color: 0xDDE8FF, metalness: 1, roughness: .05 })); mi.position.set(0, 1.7, -.75); mi.scale.set(1, 1.3, 1); grp.add(mi); fr.scale.set(1, 1, 1.3); }
+      else if (kind === 'plant') { cyl(.32, .25, .5, 0xD9743A, 0, .25, -.3, grp); [[0, .95, 0, .42], [-.3, .8, .1, .3], [.3, .85, -.1, .32], [0, 1.25, .05, .3]].forEach(([px, py, pz, r]) => { const l = sph(r, mat(0x3E9A45)); l.position.set(px, py, pz - .3); grp.add(l); }); }
+      else { box(1.2, .8, .7, 0xC77A3A, 0, .4, -.4, grp); box(1.24, .1, .74, 0x8A5A3C, 0, .82, -.4, grp); box(.5, .08, .04, 0xFFC53D, 0, .45, -.03, grp); }
+      // kép (versszak) és szám
+      const icon = textSprite((c, n) => { c.font = `${n * .62}px "Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(st.icon || '✨', n / 2, n / 2 + n * .04); });
+      icon.position.set(0, 2.75, -.2); icon.scale.setScalar(.85); grp.add(icon);
+      const num = textSprite((c, n) => { c.fillStyle = '#C6FF3D'; c.beginPath(); c.arc(n / 2, n / 2, n * .42, 0, 7); c.fill(); c.fillStyle = '#0B0D12'; c.font = `bold ${n * .5}px system-ui,sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(i + 1), n / 2, n / 2 + n * .03); });
+      num.position.set(0, 3.4, -.2); num.scale.setScalar(.38); grp.add(num);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(.55, .7, 48), new THREE.MeshBasicMaterial({ color: 0xC6FF3D, transparent: true, opacity: 0, side: THREE.DoubleSide })); ring.rotation.x = -Math.PI / 2; ring.position.set(0, .01, 1.0); grp.add(ring);
+      const hit = new THREE.Mesh(new THREE.BoxGeometry(1.9, 4, 2.4), new THREE.MeshBasicMaterial({ visible: false })); hit.position.set(0, 2, 0); grp.add(hit);
+      list.push({ grp, icon, num, ring, hit, x, standX: x, standZ: .3, mark: null });
+    });
+    return { g, list, x0, gap };
+  }
+
   // ---------- részecskék ----------
   const loader = new THREE.TextureLoader();
   const tex = u => { const t = loader.load(u); t.colorSpace = THREE.SRGBColorSpace; return t; };
@@ -251,8 +300,14 @@ export async function mountPet(canvas, opts = {}) {
   // ---------- állapot ----------
   const S = { gender: 'm', stage: 0, grow: STAGE_SCALE[0], growTo: STAGE_SCALE[0], asleep: false, sad: 0, sadTo: 0,
     happyT: 0, surpriseT: 0, jumpT: -1, eatT: -1, yawnT: -1, talk: 0, blinkT: 2, blink: 0, earT: 1.5,
-    look: new THREE.Vector2(), lookTo: new THREE.Vector2(), lastPointer: 0, idleT: 6, busy: false, listen: 0, listenTo: 0, sadFlash: 0, pulseT: -1, focus: false };
+    look: new THREE.Vector2(), lookTo: new THREE.Vector2(), lastPointer: 0, idleT: 6, busy: false, listen: 0, listenTo: 0, sadFlash: 0, pulseT: -1, focus: false, base: frame === 'palace' ? .6 : 1, px: 0, pz: 0, yaw: 0, tgtX: 0, tgtZ: 0, walking: false, at: -1 };
   let food = null, onEaten = null, speakAn = null, voiceSrc = null, ac = null;
+  if (frame === 'palace') {
+    palace = buildPalace(opts.stations || []);
+    floor.visible = cushion.visible = false;
+    const st0 = palace.list[0]; if (st0) { S.px = S.tgtX = st0.standX - 1.2; S.pz = S.tgtZ = st0.standZ; }
+    camera.position.set(S.px + .6, 2.3, 6.8);
+  }
 
   function setGender(g) {
     S.gender = g;
@@ -318,7 +373,17 @@ export async function mountPet(canvas, opts = {}) {
   // érintés és tekintet
   const onMove = e => { const r = canvas.getBoundingClientRect(); S.lookTo.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); S.lastPointer = performance.now(); };
   canvas.addEventListener('pointermove', onMove);
-  canvas.addEventListener('pointerdown', e => { onMove(e); opts.onTap?.(); });
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  canvas.addEventListener('pointerdown', e => {
+    onMove(e);
+    if (palace && opts.onStation) {
+      const r = canvas.getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ndc, camera);
+      const hit = ray.intersectObjects(palace.list.map(st => st.hit), false)[0];
+      if (hit) { opts.onStation(palace.list.findIndex(st => st.hit === hit.object)); return; }
+    }
+    opts.onTap?.();
+  });
 
   // ---------- fő ciklus ----------
   const clock = new THREE.Clock(), headWorld = V(0, 0, 0);
@@ -351,10 +416,23 @@ export async function mountPet(canvas, opts = {}) {
     }
     let bob = 0;
     if (S.pulseT >= 0) { S.pulseT += dt; bob = Math.max(0, 1 - S.pulseT / .22); if (S.pulseT > .3) S.pulseT = -1; }
-    pet.position.y = .16 + jy - bob * .03;
-    const slump = S.sad * .04;
-    pet.scale.set(S.grow * (1 + squash * .6), S.grow * (1 - squash + breath - slump), S.grow * (1 + squash * .6));
-    blob.scale.setScalar(S.grow * (1 - jy * .8)); blob.material.opacity = 1 - jy;
+    // séta a palotában: a cél felé csúszik, közben döcög és a menetirányba fordul
+    let wb = 0;
+    if (palace) {
+      const dx = S.tgtX - S.px, dz = S.tgtZ - S.pz, d = Math.hypot(dx, dz);
+      if (d > .03) { const sp = Math.min(d, dt * 2.6); S.px += dx / d * sp; S.pz += dz / d * sp; S.walking = true; wb = Math.abs(Math.sin(t * 11)) * .06; S.yaw += ((Math.atan2(dx, dz)) - S.yaw) * Math.min(1, dt * 6); }
+      else if (S.walking) { S.walking = false; S.onArrive?.(); }
+      else S.yaw += (0 - S.yaw) * Math.min(1, dt * 3);
+      pet.position.x = S.px; pet.position.z = S.pz; pet.rotation.y = S.yaw; pet.rotation.z = S.walking ? Math.sin(t * 11) * .04 : 0;
+      // kamera: oldalról követi a rókát, a falra néz
+      const cx = S.px, portrait = camera.aspect < 1, look = new THREE.Vector3(cx + .2, portrait ? 1.35 : 1.2, -1.2);
+      camera.position.lerp(new THREE.Vector3(cx + .6, portrait ? 2.3 : 2.0, portrait ? 6.8 : 5.6), Math.min(1, dt * 3)); camera.lookAt(look);
+      palace.list.forEach((st, i) => { const on = i === S.at; st.ring.material.opacity += ((on ? .9 : 0) - st.ring.material.opacity) * Math.min(1, dt * 5); st.icon.position.y = 2.75 + Math.sin(t * 1.5 + i) * .06; });
+    }
+    pet.position.y = (palace ? 0 : .16) + jy - bob * .03 + wb;
+    const slump = S.sad * .04, B = S.grow * S.base;
+    pet.scale.set(B * (1 + squash * .6), B * (1 - squash + breath - slump), B * (1 + squash * .6));
+    blob.scale.setScalar(S.grow * (1 - jy * .8)); blob.material.opacity = 1 - jy; blob.position.x = pet.position.x; blob.position.z = pet.position.z;
     if (speakAn) S.talk += (Math.min(1, level(speakAn) * 7) - S.talk) * .45; else S.talk *= .75;
     let yawn = 0; if (S.yawnT >= 0) { S.yawnT += dt; yawn = Math.sin(Math.min(1, S.yawnT / 1.6) * Math.PI); if (S.yawnT > 1.6) S.yawnT = -1; }
     const chew = S.eatT >= 0 ? Math.abs(Math.sin(S.eatT * 16)) * .6 : 0;
@@ -423,6 +501,11 @@ export async function mountPet(canvas, opts = {}) {
 
   return {
     setGender, setStage, setMood, setSleep, poke, eat, speak, audio, jump, happy, hearts, sparkle, attach, react, setListening, pulse, mouth, setFocus, setTeacher,
+    // memóriapalota
+    walkTo(i) { if (!palace?.list[i]) return Promise.resolve(); const st = palace.list[i]; S.tgtX = st.standX; S.tgtZ = st.standZ; S.at = i; return new Promise(res => { S.onArrive = () => { S.onArrive = null; res(); }; if (Math.hypot(S.tgtX - S.px, S.tgtZ - S.pz) <= .03) { S.onArrive = null; res(); } }); },
+    showIcon(i, on) { const st = palace?.list[i]; if (st) st.icon.visible = on; },
+    markStation(i, ok) { const st = palace?.list[i]; if (!st) return; st.num.material.color.set(ok == null ? 0xffffff : ok ? 0x9CF28A : 0xFF9AA5); },
+    stationCount: () => palace?.list.length || 0,
     isAsleep: () => S.asleep,
     dispose() {
       alive = false; cancelAnimationFrame(raf); io.disconnect(); ro.disconnect();
