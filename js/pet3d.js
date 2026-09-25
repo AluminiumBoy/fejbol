@@ -226,7 +226,7 @@ export async function mountPet(canvas, opts = {}) {
   // ---------- állapot ----------
   const S = { gender: 'm', stage: 0, grow: STAGE_SCALE[0], growTo: STAGE_SCALE[0], asleep: false, sad: 0, sadTo: 0,
     happyT: 0, surpriseT: 0, jumpT: -1, eatT: -1, yawnT: -1, talk: 0, blinkT: 2, blink: 0, earT: 1.5,
-    look: new THREE.Vector2(), lookTo: new THREE.Vector2(), lastPointer: 0, idleT: 6, busy: false, listen: 0, listenTo: 0, sadFlash: 0, pulseT: -1 };
+    look: new THREE.Vector2(), lookTo: new THREE.Vector2(), lastPointer: 0, idleT: 6, busy: false, listen: 0, listenTo: 0, sadFlash: 0, pulseT: -1, focus: false };
   let food = null, onEaten = null, speakAn = null, voiceSrc = null, ac = null;
 
   function setGender(g) {
@@ -277,6 +277,11 @@ export async function mountPet(canvas, opts = {}) {
     else if (kind === 'great') { happy(1.6); jump(); hearts(4); sparkle(12); }
   }
   const setListening = on => { S.listenTo = on ? 1 : 0; };
+  // fókusz mód tanulás közben: nincs magától ásítás/körülnézés, a háttér fényei elhalványulnak
+  const setFocus = on => {
+    S.focus = on; if (on) { S.yawnT = -1; S.lookTo.set(0, 0); }
+    bokeh.forEach(b => b.material.opacity = on ? .12 : (S.asleep ? .15 : .45));
+  };
   // ütemre bólogatás (rap mód) és külső hangforrás a szájhoz
   const pulse = () => { S.pulseT = 0; };
   const mouth = an => { speakAn = an; };
@@ -300,7 +305,7 @@ export async function mountPet(canvas, opts = {}) {
     S.listen += (S.listenTo - S.listen) * Math.min(1, dt * 5);
     // magától is csinál dolgokat: körülnéz, ásít, csóvál
     S.idleT -= dt;
-    if (S.idleT <= 0 && !S.asleep) {
+    if (S.idleT <= 0 && !S.asleep && !S.focus) {
       S.idleT = 4 + Math.random() * 6;
       const r = Math.random();
       if (r < .2 && S.eatT < 0) S.yawnT = 0;
@@ -370,7 +375,7 @@ export async function mountPet(canvas, opts = {}) {
     if (S.eatT >= 0) { S.eatT += dt; if (S.eatT > 1.3) { S.eatT = -1; happy(1); hearts(5); const cb = onEaten; onEaten = null; cb?.(); } }
     zzz.position.set(headWorld.x + .45 * S.grow, headWorld.y + .45 * S.grow + Math.sin(t * 1.5) * .06, headWorld.z); zzz.material.opacity = .6 + Math.sin(t * 2) * .3;
     crown.rotation.y = Math.sin(t * .8) * .1;
-    bokeh.forEach(b => { b.position.y += Math.sin(t * .4 + b.userData.ph) * .0015; });
+    if (!S.focus) bokeh.forEach(b => { b.position.y += Math.sin(t * .4 + b.userData.ph) * .0015; });
     for (let i = parts.length - 1; i >= 0; i--) {
       const p = parts[i]; p.life -= dt; p.s.position.addScaledVector(p.v, dt); p.s.material.opacity = Math.min(1, p.life);
       if (p.life <= 0) { scene.remove(p.s); parts.splice(i, 1); }
@@ -386,7 +391,7 @@ export async function mountPet(canvas, opts = {}) {
   raf = requestAnimationFrame(tick);
 
   return {
-    setGender, setStage, setMood, setSleep, poke, eat, speak, audio, jump, happy, hearts, sparkle, attach, react, setListening, pulse, mouth,
+    setGender, setStage, setMood, setSleep, poke, eat, speak, audio, jump, happy, hearts, sparkle, attach, react, setListening, pulse, mouth, setFocus,
     isAsleep: () => S.asleep,
     dispose() {
       alive = false; cancelAnimationFrame(raf); io.disconnect(); ro.disconnect();

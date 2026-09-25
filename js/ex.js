@@ -2,8 +2,8 @@
 //   ui  = { body, dock, progress(0..1), finish(score), cleanup(fn), toast(msg) }
 //   set = [{ i: versszak sorszáma, lines: [...] }]
 //   ctx = { allWords: a vers összes szava (tippekhez) }
-import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=30';
-import { lineImages, lineScene, hasHint } from './imagery.js?v=30';
+import { tokens, words, norm, esc, shuffle, shuffleApart, matchSpoken, rhymeGroups, rhymeLine } from './text.js?v=32';
+import { lineImages, lineScene, hasHint } from './imagery.js?v=32';
 
 export const EXERCISES = {
   listen:   { name: 'Meghallgatás', short: 'Hallgasd meg és olvasd fel', help: 'Hallgasd meg, aztán olvasd fel hangosan te is.', icon: 'M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4' },
@@ -14,6 +14,9 @@ export const EXERCISES = {
   hide:     { name: 'Eltűnő szavak', short: 'Egyre több szó tűnik el', help: 'Mondd el hangosan, a hiányzó szavakkal együtt. Ha elakadsz, koppints a szóra.', icon: 'M3 12s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7zM4 4l16 16' },
   initials: { name: 'Kezdőbetűk',   short: 'Csak az első betűk látszanak', help: 'Mondd el hangosan. Csak a kezdőbetűk segítenek, ha kell, koppints a szóra.', icon: 'M5 19l5-14 5 14M7 14h6M17 19V9' },
   blitz:    { name: 'Speedrun', short: '60 mp, dönts rekordot', help: 'Válaszolj minél többre 60 másodperc alatt. A rossz válasz 3 másodpercbe kerül.', icon: 'M13 2L4 14h7l-1 8 9-12h-7z', special: true },
+  echo:     { name: 'Mondd utánam', short: 'A róka mondja, te utána', help: 'A róka elmond egy sort, te utána mondod.', icon: 'M4 12h10M10 6l6 6-6 6M20 5v14' },
+  alt:      { name: 'Folytasd', short: 'Felváltva a rókával', help: 'Felváltva mondjátok: egy sor a rókáé, a következő a tiéd.', icon: 'M7 7h10M7 12h6M7 17h10' },
+  solo:     { name: 'Egyedül', short: 'Fejből, a róka figyel', help: 'Mondd el fejből, a róka figyel és ellenőriz.', icon: 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3' },
   rap:      { name: 'Rap mód', short: 'Rappeld el ütemre', help: 'Szól az ütem: rappeld a verset a rókával!', icon: 'M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z', special: true },
   recall:   { name: 'Felmondás',    short: 'Fejből, soronként', help: 'Mondd el fejből a következő sort, aztán nézd meg, jó volt-e.', icon: 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3' }
 };

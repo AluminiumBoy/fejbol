@@ -1,13 +1,13 @@
-import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=30';
-import * as S from './store.js?v=30';
-import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=30';
-import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=30';
-import * as G from './game.js?v=30';
-import * as SH from './shop.js?v=30';
-import * as MM from './memes.js?v=30';
-import * as CD from './cards.js?v=30';
-import * as P from './pet.js?v=30';
-import { lineImages, lineScene, loadScenes } from './imagery.js?v=30';
+import { parseStanzas, words, esc, rhymeGroups, rhymeLine } from './text.js?v=32';
+import * as S from './store.js?v=32';
+import { EXERCISES, run, loadAudioIndex, voiceNames, canSpeak, pickVoice, stanzaAudio, makeAudio } from './ex.js?v=32';
+import { searchPoems, fetchPoem, ocrImage } from './sources.js?v=32';
+import * as G from './game.js?v=32';
+import * as SH from './shop.js?v=32';
+import * as MM from './memes.js?v=32';
+import * as CD from './cards.js?v=32';
+import * as P from './pet.js?v=32';
+import { lineImages, lineScene, loadScenes } from './imagery.js?v=32';
 
 const app = document.getElementById('app');
 const I = {
@@ -451,7 +451,7 @@ function petHeroHTML(bp) {
 }
 let petApi = null, petVoices = new Map(), bubbleTimer;
 async function loadPet(canvas, frame) {
-  const mod = await import('./pet3d.js?v=30');
+  const mod = await import('./pet3d.js?v=32');
   const p = P.pet();
   const seen = Math.min(p.seen ?? petStage(), petStage());
   const api = await mod.mountPet(canvas, { frame, gender: p.g || 'm', stage: seen, hungry: P.hungry(), onTap: () => petTap() });
@@ -525,7 +525,7 @@ VIEWS.petpick = () => {
   app.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { P.setGender(b.dataset.g); P.giveSnacks(P.pet().snacks ? 0 : 1); G.sfx('win'); go('home', {}, false); });
 };
 
-VIEWS.pet = () => {
+VIEWS.pet = ({ learn } = {}) => {
   const p = P.pet();
   app.innerHTML = `
     <div class="petfull">
@@ -597,15 +597,20 @@ VIEWS.pet = () => {
     petSay(first[0] + ' …', null, 4200);
     try { const buf = await petApi.audio().decodeAudioData(await (await fetch(clip.url)).arrayBuffer()); await petApi.speak(buf, 1.05); } catch (e) {}
   };
-  app.querySelector('#together').onclick = async () => {
+  let autoTimer = null;
+  const openLesson = async (learnTask) => {
     if (!petApi) return;
     stopMic();
-    const { mountLesson } = await import('./lesson.js?v=30');
+    const { mountLesson } = await import('./lesson.js?v=32');
     const panel = app.querySelector('#lesson'), dock = app.querySelector('#pdock');
     dock.hidden = true; panel.hidden = false;
-    const poem = S.getPoem(S.state.lastPoem) || S.state.poems[0];
+    const poem = (learnTask && S.getPoem(learn.id)) || S.getPoem(S.state.lastPoem) || S.state.poems[0];
+    const nSt = parseStanzas(poem.text).length;
+    const toLesson = t => ({ stanzas: t.stanzas, level: t.type,
+      label: `${t.kind === 'review' ? 'Ismétlés · ' : t.kind === 'chain' || t.kind === 'whole' ? 'Egyben · ' : ''}${stanzaLabel(t.stanzas, nSt)} · ${EXERCISES[t.type].name}` });
+    let current = learnTask;
     let rewards = 0;
-    mountLesson({
+    const lesson = mountLesson({
       root: panel, poem, gender: P.pet().g || 'm',
       pet: () => petApi,
       say: (t, k, ms) => petSay(t, k, ms),
@@ -617,11 +622,32 @@ VIEWS.pet = () => {
         P.giveSnacks(1); G.sfx('win'); toast('+1 falat a versszakért!');
         const sn = app.querySelector('#sn'); if (sn) sn.textContent = P.pet().snacks;
       },
-      onExit: () => { panel.hidden = true; dock.hidden = false; panel.innerHTML = ''; }
+      onExit: () => { clearTimeout(autoTimer); panel.hidden = true; dock.hidden = false; panel.innerHTML = ''; },
+      // irányított tanulás vége: haladás, jutalom, és magától jön a következő
+      onFinished: learnTask ? ({ score }) => {
+        const t = current;
+        const r = S.applyResult(poem, t, score);
+        const rw = G.reward({ task: { ...t, type: 'recall' }, score, poem, ...r });
+        const snacks = (r.pass ? 1 : 0) + (rw.missionDone ? 1 : 0) + (r.mastered ? 1 : 0);
+        P.giveSnacks(snacks);
+        CD.givePacks((rw.missionDone ? 1 : 0) + (r.mastered ? 1 : 0) + (r.wholeDone ? 3 : 0));
+        const sn = app.querySelector('#sn'); if (sn) sn.textContent = P.pet().snacks;
+        toast(`+${rw.xp} XP${snacks ? ` · +${snacks} falat` : ''}${rw.levelUp ? ` · Új rang: ${rw.levelUp.name}` : ''}`);
+        if (r.pass) { petApi?.react('great'); G.sfx(rw.levelUp ? 'level' : 'win'); if (r.mastered || r.wholeDone) petSay('Ügyes! Ez a versszak már megy!', 'stanzadone', 3000); else petSay('Ez nagyon jó volt!', 'great'); }
+        else { petApi?.react('bad'); petSay('Majdnem! Próbáld újra!', 'tryagain'); }
+        const next = S.nextTask(poem);
+        if (!next) { setTimeout(() => { petSay('Mára kész vagy! Szuper voltál!', 'wow', 3500); lesson.stop(); app.querySelector('#lesson').hidden = true; app.querySelector('#pdock').hidden = false; }, 2600); return; }
+        current = next;
+        lesson.start(toLesson(next), false);
+        autoTimer = setTimeout(() => { if (!app.querySelector('#lesson')?.hidden) lesson.start(toLesson(next), true); }, 3200);
+      } : null
     });
+    if (learnTask) lesson.start(toLesson(learnTask), true);
   };
+  app.querySelector('#together').onclick = () => openLesson(null);
   app.querySelector('#swap').onclick = () => { P.setGender(P.pet().g === 'f' ? 'm' : 'f'); petVoices = new Map(); petApi?.setGender(P.pet().g); VIEWS.pet(); };
   loadPet(app.querySelector('#petcv'), 'full').then(() => {
+    if (learn) { S.state.lastPoem = learn.id; openLesson(learn.task); return; }
     setTimeout(() => P.hungry() ? petSay('Éhes vagyok… tanuljunk egy kicsit?', 'hungry') : petSay('Koppints rám, vagy beszélj hozzám!', null, 3000), 500);
   }).catch(() => petSay('A kisállat betöltéséhez internet kell.'));
 };
@@ -714,7 +740,12 @@ VIEWS.poem = ({ id, scope = -1 }) => {
   });
 };
 
-function startTask(poem, task) { go('exercise', { id: poem.id, task }); }
+// a tanulás fő útja a nagy rókánál folyik; a többi feladat a saját képernyőjén
+const LESSON_TYPES = ['echo', 'alt', 'solo'];
+function startTask(poem, task) {
+  if (LESSON_TYPES.includes(task.type)) { if (!P.pet().g) P.setGender('m'); go('pet', { learn: { id: poem.id, task } }); }
+  else go('exercise', { id: poem.id, task });
+}
 
 VIEWS.exercise = ({ id, task }) => {
   const poem = S.getPoem(id); if (!poem) return go('home', {}, false);

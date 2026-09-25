@@ -1,7 +1,7 @@
 // "Tanuljunk együtt": beszélgetős tanulás a nagy rókával.
 // 1. Mondd utánam  2. Folytasd (felváltva)  3. Egyedül. A róka felolvas, figyel, ellenőriz, dicsér.
-import { parseStanzas, esc, words, matchSpoken } from './text.js?v=30';
-import { lineScene, lineImages } from './imagery.js?v=30';
+import { parseStanzas, esc, words, matchSpoken } from './text.js?v=32';
+import { lineScene, lineImages } from './imagery.js?v=32';
 
 const LEVELS = { echo: 'Mondd utánam', alt: 'Folytasd', solo: 'Egyedül' };
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -18,6 +18,9 @@ export function mountLesson(deps) {
   const stanzas = parseStanzas(poem.text);
   const voice = deps.gender === 'f' ? 'noemi' : 'tamas';
   let si = 0, level = 'echo', running = false, runId = 0;
+  // irányított mód: az app adja a feladatot ({ stanzas, level, label }), a végén onFinished-del jelez
+  let task = null;
+  const curLines = () => task ? task.stanzas.flatMap(i => stanzas[i] || []) : stanzas[si];
   let stream = null, micAn = null, micCtx = null;
   const bufs = new Map();
   // soronkénti állapot a kijelzéshez: 'show' | 'hide' | 'ok' | 'miss', és az aktuális sor
@@ -89,7 +92,8 @@ export function mountLesson(deps) {
   // ---------- menet ----------
   async function run() {
     const my = ++runId; running = true;
-    const lines = stanzas[si];
+    pet()?.setFocus?.(true);
+    const lines = curLines();
     const alive = () => my === runId;
     if (!(await micReady())) deps.toast('Mikrofon nélkül a "Kész" gombbal jelezd, ha elmondtad.');
     states = lines.map(() => level === 'echo' ? 'show' : 'hide'); cur = -1; draw();
@@ -130,7 +134,9 @@ export function mountLesson(deps) {
       await wait(250);
     }
     if (!alive()) return;
-    running = false; cur = -1; draw();
+    running = false; cur = -1; pet()?.setFocus?.(false);
+    if (task && deps.onFinished) { draw(); deps.onFinished({ score: kidTurns ? good / kidTurns : 1, good, kidTurns }); return; }
+    draw();
     if (good >= Math.ceil(kidTurns * .6)) {
       pet()?.react('great'); await sayKey('stanzadone', 'Ügyes! Ez a versszak már megy!');
       deps.onReward?.(level);
@@ -140,7 +146,7 @@ export function mountLesson(deps) {
     } else await sayKey('tryagain', 'Majdnem! Próbáld újra!');
     draw();
   }
-  function stop() { runId++; running = false; try { manualDone?.(); } catch (e) {} pet()?.setListening(false); cur = -1; draw(); }
+  function stop() { runId++; running = false; pet()?.setFocus?.(false); try { manualDone?.(); } catch (e) {} pet()?.setListening(false); cur = -1; draw(); }
 
   // ---------- megjelenítés ----------
   function lineHTML(l, i) {
@@ -149,10 +155,10 @@ export function mountLesson(deps) {
     return `<div class="lline ${active ? 'cur ' + who : ''} ${st}">${active && who === 'kid' ? '<span class="turn">Te</span>' : active ? '<span class="turn fox">Róka</span>' : ''}<span class="lt">${text}</span></div>`;
   }
   function draw() {
-    const lines = stanzas[si];
+    const lines = curLines();
     if (!states.length || states.length !== lines.length) states = lines.map(() => 'show');
     root.innerHTML = `
-      <div class="lessonbar" ${running ? 'hidden' : ''}>
+      <div class="lessonbar" ${running || task ? 'hidden' : ''}>
         <div class="chips lchips">${stanzas.map((_, i) => `<button class="chip" data-si="${i}" aria-pressed="${i === si}" ${running ? 'disabled' : ''}>${i + 1}.</button>`).join('')}</div>
         <div class="chips lchips">${Object.entries(LEVELS).map(([k, t]) => `<button class="chip" data-lv="${k}" aria-pressed="${k === level}" ${running ? 'disabled' : ''}>${t}</button>`).join('')}</div>
       </div>
@@ -160,7 +166,7 @@ export function mountLesson(deps) {
       <div class="row">
         ${running
           ? `${who === 'kid' ? `<button class="btn go px grow" id="ldone">Kész, mondtam</button><button class="btn grow" id="lskip">Nem tudom</button><button class="btn" id="lhint">💭</button>` : `<span class="grow muted small" style="text-align:center">A róka beszél…</span>`}<button class="btn" id="lstop" aria-label="Megállítás">✕</button>`
-          : `<button class="btn go px grow" id="lstart">${LEVELS[level]} · ${si + 1}. versszak</button><button class="btn" id="lexit">Vissza</button>`}
+          : `<button class="btn go px grow" id="lstart">${task ? esc(task.label || LEVELS[level]) : `${LEVELS[level]} · ${si + 1}. versszak`}</button><button class="btn" id="lexit">Vissza</button>`}
       </div>`;
     root.querySelectorAll('[data-si]').forEach(b => b.onclick = () => { si = +b.dataset.si; states = []; draw(); });
     root.querySelectorAll('[data-lv]').forEach(b => b.onclick = () => { level = b.dataset.lv; states = []; draw(); });
@@ -179,5 +185,9 @@ export function mountLesson(deps) {
   }
   deps.cleanup?.(() => { stop(); stream?.getTracks().forEach(t => t.stop()); });
   draw();
-  return { stop };
+  return {
+    stop,
+    // irányított feladat indítása (autostart: rögtön indul)
+    start(t, autostart = true) { stop(); task = t; level = t.level; states = []; draw(); if (autostart) run(); }
+  };
 }
